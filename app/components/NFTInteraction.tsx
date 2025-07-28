@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
 import { toast } from 'sonner';
 import { MyNFTV4_ABI } from '../abi/MyNFTV4';
 import { Button } from './ui/button';
@@ -10,16 +10,29 @@ import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { Textarea } from './ui/textarea';
 import { isAddress } from 'viem';
+import { LOCAL_NFT_ADDRESS } from '@/app/config';
 
-// 合约地址 - 需要根据实际部署地址修改
-const CONTRACT_ADDRESS = '0x1234567890123456789012345678901234567890' as const;
+// 不同链的默认合约地址配置
+const defaultContractAddresses: Record<number, string> = {
+  1: '0x1234567890123456789012345678901234567890', // Mainnet
+  42161: '0x2345678901234567890123456789012345678901', // Arbitrum
+  11155111: '0x3456789012345678901234567890123456789012', // Sepolia
+  31337: LOCAL_NFT_ADDRESS, // Anvil
+};
 
 export default function NFTInteraction() {
   const { address, isConnected } = useAccount();
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+  const chainId = useChainId();
 
-  // 状态管理
+  // 合约地址状态管理
+  const [contractAddress, setContractAddress] = useState<string>(
+    defaultContractAddresses[chainId] || defaultContractAddresses[31337]
+  );
+  const [inputContractAddress, setInputContractAddress] = useState('');
+
+  // 其他状态管理
   const [tokenId, setTokenId] = useState('');
   const [toAddress, setToAddress] = useState('');
   const [fromAddress, setFromAddress] = useState('');
@@ -30,80 +43,118 @@ export default function NFTInteraction() {
   const [interfaceId, setInterfaceId] = useState('');
   const [ownerAddress, setOwnerAddress] = useState('');
 
+  // 链切换时更新默认合约地址
+  useEffect(() => {
+    const defaultAddress = defaultContractAddresses[chainId];
+    if (defaultAddress) {
+      setContractAddress(defaultAddress);
+    }
+  }, [chainId]);
+
+  // 设置合约地址的函数
+  const handleSetContractAddress = () => {
+    if (!inputContractAddress) {
+      toast.error('请输入合约地址');
+      return;
+    }
+    if (!isAddress(inputContractAddress)) {
+      toast.error('请输入有效的合约地址');
+      return;
+    }
+    setContractAddress(inputContractAddress);
+    toast.success('合约地址已更新');
+  };
+
+  // 重置为默认地址的函数
+  const handleResetToDefault = () => {
+    const defaultAddress = defaultContractAddresses[chainId];
+    if (defaultAddress) {
+      setContractAddress(defaultAddress);
+      setInputContractAddress('');
+      toast.success('已重置为默认合约地址');
+    } else {
+      toast.error('当前链没有配置默认合约地址');
+    }
+  };
+
   // 读取合约数据
   const { data: contractName } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress && isAddress(contractAddress) ? contractAddress as `0x${string}` : undefined,
     abi: MyNFTV4_ABI,
     functionName: 'name',
+    query: { enabled: !!contractAddress && isAddress(contractAddress) },
   });
 
   const { data: contractSymbol } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress && isAddress(contractAddress) ? contractAddress as `0x${string}` : undefined,
     abi: MyNFTV4_ABI,
     functionName: 'symbol',
+    query: { enabled: !!contractAddress && isAddress(contractAddress) },
   });
 
   const { data: contractOwner } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress && isAddress(contractAddress) ? contractAddress as `0x${string}` : undefined,
     abi: MyNFTV4_ABI,
     functionName: 'owner',
+    query: { enabled: !!contractAddress && isAddress(contractAddress) },
   });
 
   const { data: userBalance } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress && isAddress(contractAddress) ? contractAddress as `0x${string}` : undefined,
     abi: MyNFTV4_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
+    query: { enabled: !!contractAddress && isAddress(contractAddress) && !!address },
   });
 
   const { data: tokenOwner } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress && isAddress(contractAddress) ? contractAddress as `0x${string}` : undefined,
     abi: MyNFTV4_ABI,
     functionName: 'ownerOf',
     args: tokenId ? [BigInt(tokenId)] : undefined,
-    query: { enabled: !!tokenId && !isNaN(Number(tokenId)) },
+    query: { enabled: !!contractAddress && isAddress(contractAddress) && !!tokenId && !isNaN(Number(tokenId)) },
   });
 
   const { data: tokenURI } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress && isAddress(contractAddress) ? contractAddress as `0x${string}` : undefined,
     abi: MyNFTV4_ABI,
     functionName: 'tokenURI',
     args: tokenId ? [BigInt(tokenId)] : undefined,
-    query: { enabled: !!tokenId && !isNaN(Number(tokenId)) },
+    query: { enabled: !!contractAddress && isAddress(contractAddress) && !!tokenId && !isNaN(Number(tokenId)) },
   });
 
   const { data: approvedAddress } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress && isAddress(contractAddress) ? contractAddress as `0x${string}` : undefined,
     abi: MyNFTV4_ABI,
     functionName: 'getApproved',
     args: tokenId ? [BigInt(tokenId)] : undefined,
-    query: { enabled: !!tokenId && !isNaN(Number(tokenId)) },
+    query: { enabled: !!contractAddress && isAddress(contractAddress) && !!tokenId && !isNaN(Number(tokenId)) },
   });
 
   const { data: isApprovedForAll } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress && isAddress(contractAddress) ? contractAddress as `0x${string}` : undefined,
     abi: MyNFTV4_ABI,
     functionName: 'isApprovedForAll',
     args: ownerAddress && operatorAddress && isAddress(ownerAddress) && isAddress(operatorAddress) 
       ? [ownerAddress as `0x${string}`, operatorAddress as `0x${string}`] 
       : undefined,
-    query: { enabled: !!ownerAddress && !!operatorAddress && isAddress(ownerAddress) && isAddress(operatorAddress) },
+    query: { enabled: !!contractAddress && isAddress(contractAddress) && !!ownerAddress && !!operatorAddress && isAddress(ownerAddress) && isAddress(operatorAddress) },
   });
 
   const { data: balanceOfOwner } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress && isAddress(contractAddress) ? contractAddress as `0x${string}` : undefined,
     abi: MyNFTV4_ABI,
     functionName: 'balanceOf',
     args: ownerAddress && isAddress(ownerAddress) ? [ownerAddress as `0x${string}`] : undefined,
-    query: { enabled: !!ownerAddress && isAddress(ownerAddress) },
+    query: { enabled: !!contractAddress && isAddress(contractAddress) && !!ownerAddress && isAddress(ownerAddress) },
   });
 
   const { data: supportsInterface } = useReadContract({
-    address: CONTRACT_ADDRESS,
+    address: contractAddress && isAddress(contractAddress) ? contractAddress as `0x${string}` : undefined,
     abi: MyNFTV4_ABI,
     functionName: 'supportsInterface',
     args: interfaceId ? [interfaceId as `0x${string}`] : undefined,
-    query: { enabled: !!interfaceId && interfaceId.startsWith('0x') && interfaceId.length === 10 },
+    query: { enabled: !!contractAddress && isAddress(contractAddress) && !!interfaceId && interfaceId.startsWith('0x') && interfaceId.length === 10 },
   });
 
   useEffect(() => {
@@ -119,7 +170,7 @@ export default function NFTInteraction() {
       return;
     }
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress as `0x${string}`,
       abi: MyNFTV4_ABI,
       functionName: 'mint',
     });
@@ -136,7 +187,7 @@ export default function NFTInteraction() {
       return;
     }
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress as `0x${string}`,
       abi: MyNFTV4_ABI,
       functionName: 'approve',
       args: [toAddress as `0x${string}`, BigInt(tokenId)],
@@ -154,7 +205,7 @@ export default function NFTInteraction() {
       return;
     }
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress as `0x${string}`,
       abi: MyNFTV4_ABI,
       functionName: 'setApprovalForAll',
       args: [operatorAddress as `0x${string}`, approvalStatus],
@@ -172,7 +223,7 @@ export default function NFTInteraction() {
       return;
     }
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress as `0x${string}`,
       abi: MyNFTV4_ABI,
       functionName: 'transferFrom',
       args: [fromAddress as `0x${string}`, toAddress as `0x${string}`, BigInt(tokenId)],
@@ -190,7 +241,7 @@ export default function NFTInteraction() {
       return;
     }
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress as `0x${string}`,
       abi: MyNFTV4_ABI,
       functionName: 'safeTransferFrom',
       args: [fromAddress as `0x${string}`, toAddress as `0x${string}`, BigInt(tokenId)],
@@ -209,7 +260,7 @@ export default function NFTInteraction() {
     }
     const data = transferData ? transferData as `0x${string}` : '0x';
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress as `0x${string}`,
       abi: MyNFTV4_ABI,
       functionName: 'safeTransferFrom',
       args: [fromAddress as `0x${string}`, toAddress as `0x${string}`, BigInt(tokenId), data],
@@ -227,7 +278,7 @@ export default function NFTInteraction() {
       return;
     }
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress as `0x${string}`,
       abi: MyNFTV4_ABI,
       functionName: 'transferOwnership',
       args: [newOwnerAddress as `0x${string}`],
@@ -241,7 +292,7 @@ export default function NFTInteraction() {
       return;
     }
     writeContract({
-      address: CONTRACT_ADDRESS,
+      address: contractAddress as `0x${string}`,
       abi: MyNFTV4_ABI,
       functionName: 'renounceOwnership',
     });
@@ -260,6 +311,40 @@ export default function NFTInteraction() {
          {isPending && <div className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">⏳ 交易处理中</div>}
          {isConfirming && <div className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">⏳ 交易确认中</div>}
          {isConfirmed && <div className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">✅ 交易已确认</div>}
+      </div>
+
+      {/* 合约地址设置 */}
+      <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+        <h3 className="text-lg font-semibold">合约地址设置</h3>
+        
+        {/* 当前地址显示 */}
+        <div className="space-y-2">
+          <div className="text-sm">当前合约地址: {contractAddress}</div>
+          <div className="text-sm">当前链 ID: {chainId}</div>
+          <div className="text-sm">默认地址: {defaultContractAddresses[chainId] || '未配置'}</div>
+        </div>
+
+        {/* 合约地址输入 */}
+        <div className="space-y-2">
+          <Label htmlFor="contractAddress">新合约地址</Label>
+          <div className="flex space-x-2">
+            <Input
+              id="contractAddress"
+              placeholder="输入合约地址 (0x...)"
+              value={inputContractAddress}
+              onChange={(e) => setInputContractAddress(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={handleSetContractAddress} size="sm">
+              设置地址
+            </Button>
+          </div>
+        </div>
+
+        {/* 重置按钮 */}
+        <Button onClick={handleResetToDefault} variant="outline" className="w-full">
+          重置为默认地址
+        </Button>
       </div>
 
       <div className="space-y-8">

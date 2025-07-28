@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { MyTokenV4_ABI } from '../abi/MyTokenV4';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Badge } from './ui/badge';
 import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { Textarea } from './ui/textarea';
@@ -347,55 +346,48 @@ export default function TokenInteraction() {
     <div className="w-full space-y-8">
       {/* 状态指示器 */}
       <div className="flex items-center justify-center gap-4 mb-6">
-        <Badge variant={isConnected ? 'default' : 'outline'}>
-          {isConnected ? '✓ 钱包已连接' : '○ 钱包未连接'}
-        </Badge>
-        {isConfirming && <Badge>⏳ 交易确认中</Badge>}
-        {isConfirmed && <Badge>✅ 交易已确认</Badge>}
+        <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+           isConnected ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+         }`}>
+           {isConnected ? "✓ 钱包已连接" : "○ 钱包未连接"}
+         </div>
+         {isPending && <div className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">⏳ 交易处理中</div>}
+         {isConfirming && <div className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">⏳ 交易确认中</div>}
+         {isConfirmed && <div className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">✅ 交易已确认</div>}
       </div>
 
       {/* 合约地址设置 */}
-      <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-        <h3 className="text-lg font-semibold">🔧 合约地址设置</h3>
+      <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+        <h3 className="text-lg font-semibold">合约地址设置</h3>
+        
+        {/* 当前地址显示 */}
         <div className="space-y-2">
-          <Label htmlFor="currentTokenAddress">当前合约地址</Label>
-          <Input
-            id="currentTokenAddress"
-            value={tokenAddress}
-            readOnly
-            className="bg-gray-100"
-          />
+          <div className="text-sm">当前合约地址: {tokenAddress}</div>
+          <div className="text-sm">当前链 ID: {chainId}</div>
+          <div className="text-sm">默认地址: {defaultTokenAddresses[chainId] || '未配置'}</div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2 space-y-2">
-            <Label htmlFor="inputTokenAddress">新合约地址</Label>
+
+        {/* 合约地址输入 */}
+        <div className="space-y-2">
+          <Label htmlFor="tokenAddress">新合约地址</Label>
+          <div className="flex space-x-2">
             <Input
-              id="inputTokenAddress"
-              placeholder="输入新的合约地址"
+              id="tokenAddress"
+              placeholder="输入合约地址 (0x...)"
               value={inputTokenAddress}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputTokenAddress(e.target.value)}
-            />
-          </div>
-          <div className="flex gap-2 items-end">
-            <Button 
-              onClick={handleSetTokenAddress}
+              onChange={(e) => setInputTokenAddress(e.target.value)}
               className="flex-1"
-            >
+            />
+            <Button onClick={handleSetTokenAddress} size="sm">
               设置地址
             </Button>
-            <Button 
-              onClick={handleResetToDefault}
-              variant="outline"
-              className="flex-1"
-            >
-              重置默认
-            </Button>
           </div>
         </div>
-        <div className="text-sm text-gray-600">
-          <p>当前链ID: {chainId}</p>
-          <p>默认地址: {defaultTokenAddresses[chainId] || '未配置'}</p>
-        </div>
+
+        {/* 重置按钮 */}
+        <Button onClick={handleResetToDefault} variant="outline" className="w-full">
+          重置为默认地址
+        </Button>
       </div>
 
       <div className="space-y-6">

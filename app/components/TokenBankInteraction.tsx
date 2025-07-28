@@ -1,64 +1,144 @@
 import {Button} from "@/app/components/ui/button";
 import {Input} from "@/app/components/ui/input";
-import {useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract} from "wagmi";
+import {useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId} from "wagmi";
 import {parseEther, formatEther, isAddress} from "viem";
 import {toast} from "sonner";
-import {useState} from "react";
+import {useState, useEffect} from "react";
 import {MyTokenBankV4_ABI} from "@/app/abi/MyTokenBankV4";
 import {MyTokenV4_ABI} from "@/app/abi/MyTokenV4";
+import { LOCAL_TOKEN_BANK_ADDRESS, LOCAL_TOKEN_ADDRESS } from '@/app/config';
 
 export default function TokenBankInteraction() {
   const {address, isConnected} = useAccount();
   const {writeContract, data: hash} = useWriteContract();
   const {isLoading: isConfirming, isSuccess: isConfirmed} = useWaitForTransactionReceipt({hash});
+  const chainId = useChainId();
   
-  // 合约地址
-  const bankAddress = "0x34A1D3fff3958843C43aD80F30b94c510645C316" as const;
-  const tokenAddress = "0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519" as const;
+  // 不同链的默认合约地址
+  const defaultBankAddresses: Record<number, string> = {
+    1: "0x34A1D3fff3958843C43aD80F30b94c510645C316", // Mainnet
+    42161: "0x34A1D3fff3958843C43aD80F30b94c510645C316", // Arbitrum
+    11155111: "0x34A1D3fff3958843C43aD80F30b94c510645C316", // Sepolia
+    31337: LOCAL_TOKEN_BANK_ADDRESS, // Anvil
+  };
+  
+  const defaultTokenAddresses: Record<number, string> = {
+    1: "0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519", // Mainnet
+    42161: "0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519", // Arbitrum
+    11155111: "0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519", // Sepolia
+    31337: LOCAL_TOKEN_ADDRESS, // Anvil
+  };
+  
+  // 合约地址状态
+  const [bankAddress, setBankAddress] = useState<string>(defaultBankAddresses[chainId] || "");
+  const [tokenAddress, setTokenAddress] = useState<string>(defaultTokenAddresses[chainId] || "");
+  const [inputBankAddress, setInputBankAddress] = useState<string>("");
+  const [inputTokenAddress, setInputTokenAddress] = useState<string>("");
+  
+  // 当链切换时更新默认地址
+  useEffect(() => {
+    const defaultBank = defaultBankAddresses[chainId];
+    const defaultToken = defaultTokenAddresses[chainId];
+    if (defaultBank && !bankAddress) {
+      setBankAddress(defaultBank);
+    }
+    if (defaultToken && !tokenAddress) {
+      setTokenAddress(defaultToken);
+    }
+  }, [chainId]);
   
   // 状态管理
   const [queryAddress, setQueryAddress] = useState("");
   const [queryTokenAddress, setQueryTokenAddress] = useState("");
   
+  // 设置银行合约地址的函数
+  const handleSetBankAddress = () => {
+    if (!inputBankAddress) {
+      toast.error('请输入银行合约地址');
+      return;
+    }
+    if (!isAddress(inputBankAddress)) {
+      toast.error('请输入有效的银行合约地址');
+      return;
+    }
+    setBankAddress(inputBankAddress);
+    toast.success('银行合约地址已更新');
+  };
+
+  // 设置代币合约地址的函数
+  const handleSetTokenAddress = () => {
+    if (!inputTokenAddress) {
+      toast.error('请输入代币合约地址');
+      return;
+    }
+    if (!isAddress(inputTokenAddress)) {
+      toast.error('请输入有效的代币合约地址');
+      return;
+    }
+    setTokenAddress(inputTokenAddress);
+    toast.success('代币合约地址已更新');
+  };
+
+  // 重置为默认地址的函数
+  const handleResetToDefault = () => {
+    const defaultBank = defaultBankAddresses[chainId];
+    const defaultToken = defaultTokenAddresses[chainId];
+    if (defaultBank && defaultToken) {
+      setBankAddress(defaultBank);
+      setTokenAddress(defaultToken);
+      setInputBankAddress('');
+      setInputTokenAddress('');
+      toast.success('已重置为默认合约地址');
+    } else {
+      toast.error('当前链没有配置默认合约地址');
+    }
+  };
+  
   // 读取合约状态
   const {data: ethBalance} = useReadContract({
-    address: bankAddress,
+    address: bankAddress && isAddress(bankAddress) ? bankAddress as `0x${string}` : undefined,
     abi: MyTokenBankV4_ABI,
     functionName: "getEthBalance",
     args: address ? [address] : undefined,
+    query: { enabled: !!bankAddress && isAddress(bankAddress) && !!address },
   });
   
   const {data: tokenBalance} = useReadContract({
-    address: bankAddress,
+    address: bankAddress && isAddress(bankAddress) ? bankAddress as `0x${string}` : undefined,
     abi: MyTokenBankV4_ABI,
     functionName: "getTokenBalance",
-    args: [tokenAddress, address!],
+    args: tokenAddress && address && isAddress(tokenAddress) ? [tokenAddress as `0x${string}`, address] : undefined,
+    query: { enabled: !!bankAddress && isAddress(bankAddress) && !!tokenAddress && isAddress(tokenAddress) && !!address },
   });
   
   const {data: totalEthBalance} = useReadContract({
-    address: bankAddress,
+    address: bankAddress && isAddress(bankAddress) ? bankAddress as `0x${string}` : undefined,
     abi: MyTokenBankV4_ABI,
     functionName: "getTotalEthBalance",
+    query: { enabled: !!bankAddress && isAddress(bankAddress) },
   });
   
   const {data: queryEthBalance} = useReadContract({
-    address: bankAddress,
+    address: bankAddress && isAddress(bankAddress) ? bankAddress as `0x${string}` : undefined,
     abi: MyTokenBankV4_ABI,
     functionName: "getEthBalance",
     args: queryAddress && isAddress(queryAddress) ? [queryAddress as `0x${string}`] : undefined,
+    query: { enabled: !!bankAddress && isAddress(bankAddress) && !!queryAddress && isAddress(queryAddress) },
   });
   
   const {data: queryTokenBalance} = useReadContract({
-    address: bankAddress,
+    address: bankAddress && isAddress(bankAddress) ? bankAddress as `0x${string}` : undefined,
     abi: MyTokenBankV4_ABI,
     functionName: "getTokenBalance",
     args: queryTokenAddress && queryAddress && isAddress(queryTokenAddress) && isAddress(queryAddress) ? [queryTokenAddress as `0x${string}`, queryAddress as `0x${string}`] : undefined,
+    query: { enabled: !!bankAddress && isAddress(bankAddress) && !!queryTokenAddress && isAddress(queryTokenAddress) && !!queryAddress && isAddress(queryAddress) },
   });
   
   const {data: eip712Domain} = useReadContract({
-    address: bankAddress,
+    address: bankAddress && isAddress(bankAddress) ? bankAddress as `0x${string}` : undefined,
     abi: MyTokenBankV4_ABI,
     functionName: "eip712Domain",
+    query: { enabled: !!bankAddress && isAddress(bankAddress) },
   });
   
   // 以太币存款
@@ -67,7 +147,7 @@ export default function TokenBankInteraction() {
     if (!amount) return toast.error("请输入存款金额");
     try {
       writeContract({
-        address: bankAddress,
+        address: bankAddress as `0x${string}`,
         abi: MyTokenBankV4_ABI,
         functionName: "depositEth",
         value: parseEther(amount),
@@ -85,7 +165,7 @@ export default function TokenBankInteraction() {
     if (!amount) return toast.error("请输入取款金额");
     try {
       writeContract({
-        address: bankAddress,
+        address: bankAddress as `0x${string}`,
         abi: MyTokenBankV4_ABI,
         functionName: "withdrawEth",
         args: [parseEther(amount)],
@@ -104,7 +184,7 @@ export default function TokenBankInteraction() {
     if (!isAddress(to)) return toast.error("无效的接收地址");
     try {
       writeContract({
-        address: bankAddress,
+        address: bankAddress as `0x${string}`,
         abi: MyTokenBankV4_ABI,
         functionName: "transferEth",
         args: [to as `0x${string}`, parseEther(amount)],
@@ -127,13 +207,13 @@ export default function TokenBankInteraction() {
         address: tokenAddr as `0x${string}`,
         abi: MyTokenV4_ABI,
         functionName: "approve",
-        args: [bankAddress, parseEther(amount)],
+        args: [bankAddress as `0x${string}`, parseEther(amount)],
         chainId: 31337,
       });
       // 然后存款
       setTimeout(() => {
         writeContract({
-          address: bankAddress,
+          address: bankAddress as `0x${string}`,
           abi: MyTokenBankV4_ABI,
           functionName: "depositToken",
           args: [tokenAddr as `0x${string}`, parseEther(amount)],
@@ -153,7 +233,7 @@ export default function TokenBankInteraction() {
     if (!isAddress(tokenAddr)) return toast.error("无效的代币地址");
     try {
       writeContract({
-        address: bankAddress,
+        address: bankAddress as `0x${string}`,
         abi: MyTokenBankV4_ABI,
         functionName: "depositWithPermit",
         args: [tokenAddr as `0x${string}`, parseEther(amount), BigInt(deadline), parseInt(v), r as `0x${string}`, s as `0x${string}`],
@@ -172,7 +252,7 @@ export default function TokenBankInteraction() {
     if (!isAddress(tokenAddr)) return toast.error("无效的代币地址");
     try {
       writeContract({
-        address: bankAddress,
+        address: bankAddress as `0x${string}`,
         abi: MyTokenBankV4_ABI,
         functionName: "withdrawToken",
         args: [tokenAddr as `0x${string}`, parseEther(amount)],
@@ -192,7 +272,7 @@ export default function TokenBankInteraction() {
     if (!isAddress(to)) return toast.error("无效的接收地址");
     try {
       writeContract({
-        address: bankAddress,
+        address: bankAddress as `0x${string}`,
         abi: MyTokenBankV4_ABI,
         functionName: "transferToken",
         args: [tokenAddr as `0x${string}`, to as `0x${string}`, parseEther(amount)],
@@ -215,6 +295,59 @@ export default function TokenBankInteraction() {
          </div>
          {isConfirming && <div className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">⏳ 交易确认中</div>}
          {isConfirmed && <div className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">✅ 交易已确认</div>}
+      </div>
+      
+      {/* 合约地址设置 */}
+      <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+        <h3 className="text-lg font-semibold">合约地址设置</h3>
+        
+        {/* 当前地址显示 */}
+        <div className="space-y-2">
+          <div className="text-sm">当前银行合约地址: {bankAddress}</div>
+          <div className="text-sm">当前代币合约地址: {tokenAddress}</div>
+          <div className="text-sm">当前链 ID: {chainId}</div>
+          <div className="text-sm">默认银行地址: {defaultBankAddresses[chainId] || '未配置'}</div>
+          <div className="text-sm">默认代币地址: {defaultTokenAddresses[chainId] || '未配置'}</div>
+        </div>
+
+        {/* 银行合约地址输入 */}
+        <div className="space-y-2">
+          <label htmlFor="bankAddress" className="block text-sm font-medium">新银行合约地址</label>
+          <div className="flex space-x-2">
+            <Input
+              id="bankAddress"
+              placeholder="输入银行合约地址 (0x...)"
+              value={inputBankAddress}
+              onChange={(e) => setInputBankAddress(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={handleSetBankAddress} size="sm">
+              设置银行地址
+            </Button>
+          </div>
+        </div>
+
+        {/* 代币合约地址输入 */}
+        <div className="space-y-2">
+          <label htmlFor="tokenAddress" className="block text-sm font-medium">新代币合约地址</label>
+          <div className="flex space-x-2">
+            <Input
+              id="tokenAddress"
+              placeholder="输入代币合约地址 (0x...)"
+              value={inputTokenAddress}
+              onChange={(e) => setInputTokenAddress(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={handleSetTokenAddress} size="sm">
+              设置代币地址
+            </Button>
+          </div>
+        </div>
+
+        {/* 重置按钮 */}
+        <Button onClick={handleResetToDefault} variant="outline" className="w-full">
+          重置为默认地址
+        </Button>
       </div>
       
       {/* 合约基本信息 */}
@@ -475,7 +608,7 @@ export default function TokenBankInteraction() {
           <label className="block text-sm font-medium">EIP712 Domain</label>
           <div className="p-2 bg-gray-100 rounded max-h-40 overflow-y-auto">
             {eip712Domain ? (
-              <pre className="text-xs">{JSON.stringify(eip712Domain, null, 2)}</pre>
+              <pre className="text-xs">{JSON.stringify(eip712Domain, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2)}</pre>
             ) : (
               "加载中..."
             )}

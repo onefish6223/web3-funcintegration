@@ -1,20 +1,83 @@
 import {Button} from "@/app/components/ui/button";
 import {Input} from "@/app/components/ui/input";
-import {useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract} from "wagmi";
+import {Label} from "@/app/components/ui/label";
+import {useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId} from "wagmi";
 import {parseEther, formatEther, isAddress} from "viem";
 import {toast} from "sonner";
-import {useState} from "react";
+import {useState, useEffect} from "react";
 import {MyNFTV4_ABI} from "@/app/abi/MyNFTV4";
 import {MyNFTMarketV4_ABI} from "@/app/abi/MyNFTMarketV4";
+import { LOCAL_NFT_ADDRESS, LOCAL_NFT_MARKET_ADDRESS } from '@/app/config';
 
 export default function NFTMarketInteraction() {
   const {address, isConnected} = useAccount();
   const {writeContract, data: hash} = useWriteContract();
   const {isLoading: isConfirming, isSuccess: isConfirmed} = useWaitForTransactionReceipt({hash});
+  const chainId = useChainId();
   
-  // 合约地址
-  const nftAddress = "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512" as const;
-  const marketAddress = "0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9" as const;
+  // 默认合约地址配置
+  const defaultNftAddresses: Record<number, string> = {
+    11155111: "0x1234567890123456789012345678901234567890", // Sepolia
+    80001: "0x2345678901234567890123456789012345678901",    // Polygon Mumbai
+    31337: LOCAL_NFT_ADDRESS,    // Local
+  };
+  
+  const defaultMarketAddresses: Record<number, string> = {
+    11155111: "0x3456789012345678901234567890123456789012", // Sepolia
+    80001: "0x4567890123456789012345678901234567890123",    // Polygon Mumbai
+    31337: LOCAL_NFT_MARKET_ADDRESS,    // Local
+  };
+  
+  // 合约地址状态管理
+  const [nftAddress, setNftAddress] = useState<string>(defaultNftAddresses[chainId] || defaultNftAddresses[31337]);
+  const [marketAddress, setMarketAddress] = useState<string>(defaultMarketAddresses[chainId] || defaultMarketAddresses[31337]);
+  const [inputNftAddress, setInputNftAddress] = useState<string>("");
+  const [inputMarketAddress, setInputMarketAddress] = useState<string>("");
+  
+  // 链切换时更新默认地址
+  useEffect(() => {
+    const defaultNft = defaultNftAddresses[chainId] || defaultNftAddresses[31337];
+    const defaultMarket = defaultMarketAddresses[chainId] || defaultMarketAddresses[31337];
+    setNftAddress(defaultNft);
+    setMarketAddress(defaultMarket);
+  }, [chainId]);
+  
+  // 设置合约地址的处理函数
+  const handleSetNftAddress = () => {
+    if (!inputNftAddress) {
+      toast.error("请输入 NFT 合约地址");
+      return;
+    }
+    if (!isAddress(inputNftAddress)) {
+      toast.error("无效的 NFT 合约地址");
+      return;
+    }
+    setNftAddress(inputNftAddress);
+    toast.success("NFT 合约地址已更新");
+  };
+  
+  const handleSetMarketAddress = () => {
+    if (!inputMarketAddress) {
+      toast.error("请输入市场合约地址");
+      return;
+    }
+    if (!isAddress(inputMarketAddress)) {
+      toast.error("无效的市场合约地址");
+      return;
+    }
+    setMarketAddress(inputMarketAddress);
+    toast.success("市场合约地址已更新");
+  };
+  
+  const handleResetToDefault = () => {
+    const defaultNft = defaultNftAddresses[chainId] || defaultNftAddresses[31337];
+    const defaultMarket = defaultMarketAddresses[chainId] || defaultMarketAddresses[31337];
+    setNftAddress(defaultNft);
+    setMarketAddress(defaultMarket);
+    setInputNftAddress("");
+    setInputMarketAddress("");
+    toast.success("已重置为默认地址");
+  };
   
   // 状态管理
   const [queryAddress, setQueryAddress] = useState("");
@@ -25,95 +88,108 @@ export default function NFTMarketInteraction() {
   
   // 读取合约状态
   const {data: platformFeePercentage} = useReadContract({
-    address: marketAddress,
+    address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "platformFeePercentage",
+    query: { enabled: !!marketAddress && isAddress(marketAddress) },
   });
-  
+
   const {data: feeReceiver} = useReadContract({
-    address: marketAddress,
+    address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "feeReceiver",
+    query: { enabled: !!marketAddress && isAddress(marketAddress) },
   });
-  
+
   const {data: signer} = useReadContract({
-    address: marketAddress,
+    address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "signer",
+    query: { enabled: !!marketAddress && isAddress(marketAddress) },
   });
   
   const {data: owner} = useReadContract({
-    address: marketAddress,
+    address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "owner",
+    query: { enabled: !!marketAddress && isAddress(marketAddress) },
   });
   
   const {data: userNonces} = useReadContract({
-    address: marketAddress,
+    address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "nonces",
     args: queryAddress && isAddress(queryAddress) ? [queryAddress as `0x${string}`] : undefined,
+    query: { enabled: !!marketAddress && isAddress(marketAddress) && !!queryAddress && isAddress(queryAddress) },
   });
   
   const {data: listingInfo} = useReadContract({
-    address: marketAddress,
+    address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "listings",
     args: queryListingId ? [BigInt(queryListingId)] : undefined,
+    query: { enabled: !!marketAddress && isAddress(marketAddress) && !!queryListingId },
   });
   
   const {data: nftListingId} = useReadContract({
-    address: marketAddress,
+    address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "nftToListingId",
     args: queryNftContract && queryTokenId && isAddress(queryNftContract) ? [queryNftContract as `0x${string}`, BigInt(queryTokenId)] : undefined,
+    query: { enabled: !!marketAddress && isAddress(marketAddress) && !!queryNftContract && isAddress(queryNftContract) && !!queryTokenId },
   });
   
   const {data: usedSignature} = useReadContract({
-    address: marketAddress,
+    address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "usedSignatures",
     args: querySignatureHash ? [querySignatureHash as `0x${string}`] : undefined,
+    query: { enabled: !!marketAddress && isAddress(marketAddress) && !!querySignatureHash },
   });
   
   const {data: latestListings} = useReadContract({
-    address: marketAddress,
+    address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "getLatestListings",
     args: [BigInt(10)], // 获取最新10个listing
+    query: { enabled: !!marketAddress && isAddress(marketAddress) },
   });
   
   const {data: userListings} = useReadContract({
-    address: marketAddress,
+    address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "getUserListings",
     args: queryAddress && isAddress(queryAddress) ? [queryAddress as `0x${string}`] : undefined,
+    query: { enabled: !!marketAddress && isAddress(marketAddress) && !!queryAddress && isAddress(queryAddress) },
   });
   
   const {data: nftListing} = useReadContract({
-    address: marketAddress,
+    address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "getNFTListing",
     args: queryNftContract && queryTokenId && isAddress(queryNftContract) ? [queryNftContract as `0x${string}`, BigInt(queryTokenId)] : undefined,
+    query: { enabled: !!marketAddress && isAddress(marketAddress) && !!queryNftContract && isAddress(queryNftContract) && !!queryTokenId },
   });
   
   const {data: eip712Domain} = useReadContract({
-    address: marketAddress,
+    address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "eip712Domain",
+    query: { enabled: !!marketAddress && isAddress(marketAddress) },
   });
   
   const {data: permitTypehash} = useReadContract({
-    address: marketAddress,
+    address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "PERMIT_TYPEHASH",
+    query: { enabled: !!marketAddress && isAddress(marketAddress) },
   });
   
   // NFT 铸造
   const handleMint = async () => {
     if (!isConnected) return toast.error("请连接钱包");
     try {
-      writeContract({address: nftAddress, abi: MyNFTV4_ABI, functionName: "mint", chainId: 31337});
+      writeContract({address: nftAddress as `0x${string}`, abi: MyNFTV4_ABI, functionName: "mint", chainId: 31337});
       toast.success("NFT 铸造已发起");
     } catch (error) {
       toast.error("NFT 铸造失败");
@@ -126,10 +202,10 @@ export default function NFTMarketInteraction() {
     if (!tokenId || !price) return toast.error("请填写完整信息");
     try {
       writeContract({
-        address: marketAddress,
+        address: marketAddress as `0x${string}`,
         abi: MyNFTMarketV4_ABI,
         functionName: "create721Listing",
-        args: [nftAddress, BigInt(tokenId), parseEther(price), requiresWhitelist],
+        args: [nftAddress as `0x${string}`, BigInt(tokenId), parseEther(price), requiresWhitelist],
         chainId: 31337,
       });
       toast.success("ERC721 上架已发起");
@@ -145,7 +221,7 @@ export default function NFTMarketInteraction() {
     if (!isAddress(nftContract)) return toast.error("无效的合约地址");
     try {
       writeContract({
-        address: marketAddress,
+        address: marketAddress as `0x${string}`,
         abi: MyNFTMarketV4_ABI,
         functionName: "create1155Listing",
         args: [nftContract as `0x${string}`, BigInt(tokenId), BigInt(amount), parseEther(price), requiresWhitelist],
@@ -163,7 +239,7 @@ export default function NFTMarketInteraction() {
     if (!listingId) return toast.error("请输入 Listing ID");
     try {
       writeContract({
-        address: marketAddress,
+        address: marketAddress as `0x${string}`,
         abi: MyNFTMarketV4_ABI,
         functionName: "cancelListing",
         args: [BigInt(listingId)],
@@ -181,7 +257,7 @@ export default function NFTMarketInteraction() {
     if (!listingId || !amount || !value) return toast.error("请填写完整信息");
     try {
       writeContract({
-        address: marketAddress,
+        address: marketAddress as `0x${string}`,
         abi: MyNFTMarketV4_ABI,
         functionName: "buyNFT",
         args: [BigInt(listingId), BigInt(amount)],
@@ -200,7 +276,7 @@ export default function NFTMarketInteraction() {
     if (!listingId || !amount || !deadline || !v || !r || !s) return toast.error("请填写完整信息");
     try {
       writeContract({
-        address: marketAddress,
+        address: marketAddress as `0x${string}`,
         abi: MyNFTMarketV4_ABI,
         functionName: "permitBuy",
         args: [BigInt(listingId), BigInt(amount), BigInt(deadline), parseInt(v), r as `0x${string}`, s as `0x${string}`],
@@ -219,7 +295,7 @@ export default function NFTMarketInteraction() {
     if (!isAddress(signerAddress)) return toast.error("无效的地址");
     try {
       writeContract({
-        address: marketAddress,
+        address: marketAddress as `0x${string}`,
         abi: MyNFTMarketV4_ABI,
         functionName: "setSigner",
         args: [signerAddress as `0x${string}`],
@@ -237,7 +313,7 @@ export default function NFTMarketInteraction() {
     if (!feePercentage) return toast.error("请输入手续费比例");
     try {
       writeContract({
-        address: marketAddress,
+        address: marketAddress as `0x${string}`,
         abi: MyNFTMarketV4_ABI,
         functionName: "setPlatformFeePercentage",
         args: [BigInt(feePercentage)],
@@ -256,7 +332,7 @@ export default function NFTMarketInteraction() {
     if (!isAddress(receiverAddress)) return toast.error("无效的地址");
     try {
       writeContract({
-        address: marketAddress,
+        address: marketAddress as `0x${string}`,
         abi: MyNFTMarketV4_ABI,
         functionName: "setFeeReceiver",
         args: [receiverAddress as `0x${string}`],
@@ -275,7 +351,7 @@ export default function NFTMarketInteraction() {
     if (!isAddress(newOwner)) return toast.error("无效的地址");
     try {
       writeContract({
-        address: marketAddress,
+        address: marketAddress as `0x${string}`,
         abi: MyNFTMarketV4_ABI,
         functionName: "transferOwnership",
         args: [newOwner as `0x${string}`],
@@ -292,7 +368,7 @@ export default function NFTMarketInteraction() {
     if (!isConnected) return toast.error("请连接钱包");
     try {
       writeContract({
-        address: marketAddress,
+        address: marketAddress as `0x${string}`,
         abi: MyNFTMarketV4_ABI,
         functionName: "renounceOwnership",
         chainId: 31337,
@@ -322,6 +398,59 @@ export default function NFTMarketInteraction() {
          {isConfirmed && <div className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">✅ 交易已确认</div>}
       </div>
 
+      {/* 合约地址设置 */}
+      <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+        <h3 className="text-lg font-semibold">合约地址设置</h3>
+        
+        {/* 当前地址显示 */}
+        <div className="space-y-2">
+          <div className="text-sm">当前市场合约地址: {marketAddress}</div>
+          <div className="text-sm">当前 NFT 合约地址: {nftAddress}</div>
+          <div className="text-sm">当前链 ID: {chainId}</div>
+          <div className="text-sm">默认市场地址: {defaultMarketAddresses[chainId] || '未配置'}</div>
+          <div className="text-sm">默认 NFT 地址: {defaultNftAddresses[chainId] || '未配置'}</div>
+        </div>
+
+        {/* 市场合约地址输入 */}
+        <div className="space-y-2">
+          <Label htmlFor="marketAddress">新市场合约地址</Label>
+          <div className="flex space-x-2">
+            <Input
+              id="marketAddress"
+              placeholder="输入市场合约地址 (0x...)"
+              value={inputMarketAddress}
+              onChange={(e) => setInputMarketAddress(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={handleSetMarketAddress} size="sm">
+              设置地址
+            </Button>
+          </div>
+        </div>
+
+        {/* NFT 合约地址输入 */}
+        <div className="space-y-2">
+          <Label htmlFor="nftAddress">新 NFT 合约地址</Label>
+          <div className="flex space-x-2">
+            <Input
+              id="nftAddress"
+              placeholder="输入 NFT 合约地址 (0x...)"
+              value={inputNftAddress}
+              onChange={(e) => setInputNftAddress(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={handleSetNftAddress} size="sm">
+              设置地址
+            </Button>
+          </div>
+        </div>
+
+        {/* 重置按钮 */}
+        <Button onClick={handleResetToDefault} variant="outline" className="w-full">
+          重置为默认地址
+        </Button>
+      </div>
+
       <div className="space-y-8">
       
       {/* 合约基本信息 */}
@@ -337,8 +466,8 @@ export default function NFTMarketInteraction() {
             <div className="font-mono text-xs break-all">{nftAddress}</div>
           </div>
           <div>
-            <label className="block text-sm font-medium">平台手续费比例</label>
-            <div>{platformFeePercentage ? platformFeePercentage.toString() : "加载中..."}</div>
+            <label className="block text-sm font-medium">平台手续费比例(/10000)</label>
+            <div>{platformFeePercentage ? platformFeePercentage.toString() : "0"}</div>
           </div>
           <div>
             <label className="block text-sm font-medium">手续费接收地址</label>
@@ -647,7 +776,7 @@ export default function NFTMarketInteraction() {
             <label className="block text-sm font-medium">用户 Listings</label>
             <div className="p-2 bg-gray-100 rounded max-h-40 overflow-y-auto">
               {userListings ? (
-                <pre className="text-xs">{JSON.stringify(userListings, null, 2)}</pre>
+                <pre className="text-xs">{JSON.stringify(userListings, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2)}</pre>
               ) : (
                 "加载中..."
               )}
@@ -671,7 +800,7 @@ export default function NFTMarketInteraction() {
             <label className="block text-sm font-medium">Listing 信息</label>
             <div className="p-2 bg-gray-100 rounded max-h-40 overflow-y-auto">
               {listingInfo ? (
-                <pre className="text-xs">{JSON.stringify(listingInfo, null, 2)}</pre>
+                <pre className="text-xs">{JSON.stringify(listingInfo, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2)}</pre>
               ) : (
                 "加载中..."
               )}
@@ -710,7 +839,7 @@ export default function NFTMarketInteraction() {
             <label className="block text-sm font-medium">NFT Listing 信息</label>
             <div className="p-2 bg-gray-100 rounded max-h-40 overflow-y-auto">
               {nftListing ? (
-                <pre className="text-xs">{JSON.stringify(nftListing, null, 2)}</pre>
+                <pre className="text-xs">{JSON.stringify(nftListing, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2)}</pre>
               ) : (
                 "加载中..."
               )}
@@ -743,7 +872,7 @@ export default function NFTMarketInteraction() {
           <label className="block text-sm font-medium">最新 Listings (前10个)</label>
           <div className="p-2 bg-gray-100 rounded max-h-60 overflow-y-auto">
             {latestListings ? (
-              <pre className="text-xs">{JSON.stringify(latestListings, null, 2)}</pre>
+              <pre className="text-xs">{JSON.stringify(latestListings, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2)}</pre>
             ) : (
               "加载中..."
             )}
@@ -762,7 +891,7 @@ export default function NFTMarketInteraction() {
           <label className="block text-sm font-medium">EIP712 Domain</label>
           <div className="p-2 bg-gray-100 rounded max-h-40 overflow-y-auto">
             {eip712Domain ? (
-              <pre className="text-xs">{JSON.stringify(eip712Domain, null, 2)}</pre>
+              <pre className="text-xs">{JSON.stringify(eip712Domain, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2)}</pre>
             ) : (
               "加载中..."
             )}
