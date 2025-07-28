@@ -40,13 +40,7 @@ contract DepositWithPermit2Example {
         // token.approve(address(permit2), amount);
         
         // 调用银行合约的depositWithPermit2方法
-        bank.depositWithPermit2(
-            address(token),
-            amount,
-            nonce,
-            deadline,
-            signature
-        );
+        // 
     }
     
     /**

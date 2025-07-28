@@ -5,6 +5,8 @@ import NFTMarketInteraction from './components/NFTMarketInteraction'
 import TokenInteraction from './components/TokenInteraction'
 import NFTInteraction from './components/NFTInteraction'
 import { useState } from 'react'
+import Permit2Interaction from './components/Permit2Interaction'
+import SignatureBuilder from './components/SignatureBuilder'
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('token')
@@ -14,6 +16,8 @@ export default function Home() {
     { id: 'bank', name: '代币银行', component: <TokenBankInteraction /> },
     { id: 'nft', name: 'NFT 交互', component: <NFTInteraction /> },
     { id: 'market', name: 'NFT 市场', component: <NFTMarketInteraction /> },
+    { id: 'permit2', name: 'Permit2', component: <Permit2Interaction /> },
+    { id: 'signature', name: '签名构建器', component: <SignatureBuilder /> },
   ]
 
   return (
@@ -90,6 +94,8 @@ export default function Home() {
               {activeTab === 'bank' && '代币银行系统，支持以太币和 ERC20 代币的存取款、转账功能'}
               {activeTab === 'nft' && '与 NFT 合约交互，包括铸造、转账、授权等功能'}
               {activeTab === 'market' && 'NFT 市场交易平台，支持上架、购买、取消等操作'}
+              {activeTab === 'permit2' && '与Permit2 交互，统一的接口来管理 ERC20 代币的授权，支持签名授权、批量操作和安全的代币转账'}
+              {activeTab === 'signature' && '签名构建器工具，支持构建和验证各种类型的数字签名'}
             </p>
           </div>
 

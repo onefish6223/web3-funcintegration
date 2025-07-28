@@ -1,181 +1,195 @@
 export const MyTokenBankV4_ABI = [
-  {type: "constructor", inputs: [], stateMutability: "nonpayable"},
-  {type: "receive", stateMutability: "payable"},
-  {type: "function", name: "depositEth", inputs: [], outputs: [], stateMutability: "payable"},
-  {
-    type: "function",
-    name: "depositToken",
-    inputs: [
-      {name: "token", type: "address", internalType: "address"},
-      {name: "amount", type: "uint256", internalType: "uint256"},
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "depositWithPermit",
-    inputs: [
-      {name: "token", type: "address", internalType: "address"},
-      {name: "amount", type: "uint256", internalType: "uint256"},
-      {name: "deadline", type: "uint256", internalType: "uint256"},
-      {name: "v", type: "uint8", internalType: "uint8"},
-      {name: "r", type: "bytes32", internalType: "bytes32"},
-      {name: "s", type: "bytes32", internalType: "bytes32"},
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "eip712Domain",
-    inputs: [],
-    outputs: [
-      {name: "fields", type: "bytes1", internalType: "bytes1"},
-      {name: "name", type: "string", internalType: "string"},
-      {name: "version", type: "string", internalType: "string"},
-      {name: "chainId", type: "uint256", internalType: "uint256"},
-      {name: "verifyingContract", type: "address", internalType: "address"},
-      {name: "salt", type: "bytes32", internalType: "bytes32"},
-      {name: "extensions", type: "uint256[]", internalType: "uint256[]"},
-    ],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "getEthBalance",
-    inputs: [{name: "account", type: "address", internalType: "address"}],
-    outputs: [{name: "", type: "uint256", internalType: "uint256"}],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "getTokenBalance",
-    inputs: [
-      {name: "token", type: "address", internalType: "address"},
-      {name: "account", type: "address", internalType: "address"},
-    ],
-    outputs: [{name: "", type: "uint256", internalType: "uint256"}],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "getTotalEthBalance",
-    inputs: [],
-    outputs: [{name: "", type: "uint256", internalType: "uint256"}],
-    stateMutability: "view",
-  },
-  {
-    type: "function",
-    name: "onTransferReceived",
-    inputs: [
-      {name: "", type: "address", internalType: "address"},
-      {name: "sender", type: "address", internalType: "address"},
-      {name: "amount", type: "uint256", internalType: "uint256"},
-      {name: "data", type: "bytes", internalType: "bytes"},
-    ],
-    outputs: [{name: "", type: "bytes4", internalType: "bytes4"}],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "transferEth",
-    inputs: [
-      {name: "to", type: "address", internalType: "address"},
-      {name: "amount", type: "uint256", internalType: "uint256"},
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "transferToken",
-    inputs: [
-      {name: "token", type: "address", internalType: "address"},
-      {name: "to", type: "address", internalType: "address"},
-      {name: "amount", type: "uint256", internalType: "uint256"},
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "withdrawEth",
-    inputs: [{name: "amount", type: "uint256", internalType: "uint256"}],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  {
-    type: "function",
-    name: "withdrawToken",
-    inputs: [
-      {name: "token", type: "address", internalType: "address"},
-      {name: "amount", type: "uint256", internalType: "uint256"},
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  {type: "event", name: "EIP712DomainChanged", inputs: [], anonymous: false},
-  {
-    type: "event",
-    name: "EthDeposited",
-    inputs: [
-      {name: "user", type: "address", indexed: true, internalType: "address"},
-      {name: "amount", type: "uint256", indexed: false, internalType: "uint256"},
-    ],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "EthTransferred",
-    inputs: [
-      {name: "from", type: "address", indexed: true, internalType: "address"},
-      {name: "to", type: "address", indexed: true, internalType: "address"},
-      {name: "amount", type: "uint256", indexed: false, internalType: "uint256"},
-    ],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "EthWithdrawn",
-    inputs: [
-      {name: "user", type: "address", indexed: true, internalType: "address"},
-      {name: "amount", type: "uint256", indexed: false, internalType: "uint256"},
-    ],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "TokenDeposited",
-    inputs: [
-      {name: "token", type: "address", indexed: true, internalType: "address"},
-      {name: "user", type: "address", indexed: true, internalType: "address"},
-      {name: "amount", type: "uint256", indexed: false, internalType: "uint256"},
-    ],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "TokenTransferred",
-    inputs: [
-      {name: "token", type: "address", indexed: true, internalType: "address"},
-      {name: "from", type: "address", indexed: true, internalType: "address"},
-      {name: "to", type: "address", indexed: true, internalType: "address"},
-      {name: "amount", type: "uint256", indexed: false, internalType: "uint256"},
-    ],
-    anonymous: false,
-  },
-  {
-    type: "event",
-    name: "TokenWithdrawn",
-    inputs: [
-      {name: "token", type: "address", indexed: true, internalType: "address"},
-      {name: "user", type: "address", indexed: true, internalType: "address"},
-      {name: "amount", type: "uint256", indexed: false, internalType: "uint256"},
-    ],
-    anonymous: false,
-  },
-  {type: "error", name: "InvalidShortString", inputs: []},
-  {type: "error", name: "ReentrancyGuardReentrantCall", inputs: []},
-  {type: "error", name: "StringTooLong", inputs: [{name: "str", type: "string", internalType: "string"}]},
+  {"type": "constructor", "inputs": [], "stateMutability": "nonpayable"},
+    {"type": "receive", "stateMutability": "payable"},
+    {"type": "function", "name": "depositEth", "inputs": [], "outputs": [], "stateMutability": "payable"},
+    {
+      "type": "function",
+      "name": "depositToken",
+      "inputs": [
+        {"name": "token", "type": "address", "internalType": "address"},
+        {"name": "amount", "type": "uint256", "internalType": "uint256"}
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "depositWithPermit",
+      "inputs": [
+        {"name": "token", "type": "address", "internalType": "address"},
+        {"name": "amount", "type": "uint256", "internalType": "uint256"},
+        {"name": "deadline", "type": "uint256", "internalType": "uint256"},
+        {"name": "v", "type": "uint8", "internalType": "uint8"},
+        {"name": "r", "type": "bytes32", "internalType": "bytes32"},
+        {"name": "s", "type": "bytes32", "internalType": "bytes32"}
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "depositWithPermit2",
+      "inputs": [
+        {"name": "permit2Address", "type": "address", "internalType": "address"},
+        {"name": "token", "type": "address", "internalType": "address"},
+        {"name": "amount", "type": "uint256", "internalType": "uint256"},
+        {"name": "nonce", "type": "uint256", "internalType": "uint256"},
+        {"name": "deadline", "type": "uint256", "internalType": "uint256"},
+        {"name": "signature", "type": "bytes", "internalType": "bytes"}
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "eip712Domain",
+      "inputs": [],
+      "outputs": [
+        {"name": "fields", "type": "bytes1", "internalType": "bytes1"},
+        {"name": "name", "type": "string", "internalType": "string"},
+        {"name": "version", "type": "string", "internalType": "string"},
+        {"name": "chainId", "type": "uint256", "internalType": "uint256"},
+        {"name": "verifyingContract", "type": "address", "internalType": "address"},
+        {"name": "salt", "type": "bytes32", "internalType": "bytes32"},
+        {"name": "extensions", "type": "uint256[]", "internalType": "uint256[]"}
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getEthBalance",
+      "inputs": [{"name": "account", "type": "address", "internalType": "address"}],
+      "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getTokenBalance",
+      "inputs": [
+        {"name": "token", "type": "address", "internalType": "address"},
+        {"name": "account", "type": "address", "internalType": "address"}
+      ],
+      "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getTotalEthBalance",
+      "inputs": [],
+      "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "onTransferReceived",
+      "inputs": [
+        {"name": "", "type": "address", "internalType": "address"},
+        {"name": "sender", "type": "address", "internalType": "address"},
+        {"name": "amount", "type": "uint256", "internalType": "uint256"},
+        {"name": "data", "type": "bytes", "internalType": "bytes"}
+      ],
+      "outputs": [{"name": "", "type": "bytes4", "internalType": "bytes4"}],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "transferEth",
+      "inputs": [
+        {"name": "to", "type": "address", "internalType": "address"},
+        {"name": "amount", "type": "uint256", "internalType": "uint256"}
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "transferToken",
+      "inputs": [
+        {"name": "token", "type": "address", "internalType": "address"},
+        {"name": "to", "type": "address", "internalType": "address"},
+        {"name": "amount", "type": "uint256", "internalType": "uint256"}
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "withdrawEth",
+      "inputs": [{"name": "amount", "type": "uint256", "internalType": "uint256"}],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "withdrawToken",
+      "inputs": [
+        {"name": "token", "type": "address", "internalType": "address"},
+        {"name": "amount", "type": "uint256", "internalType": "uint256"}
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {"type": "event", "name": "EIP712DomainChanged", "inputs": [], "anonymous": false},
+    {
+      "type": "event",
+      "name": "EthDeposited",
+      "inputs": [
+        {"name": "user", "type": "address", "indexed": true, "internalType": "address"},
+        {"name": "amount", "type": "uint256", "indexed": false, "internalType": "uint256"}
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "EthTransferred",
+      "inputs": [
+        {"name": "from", "type": "address", "indexed": true, "internalType": "address"},
+        {"name": "to", "type": "address", "indexed": true, "internalType": "address"},
+        {"name": "amount", "type": "uint256", "indexed": false, "internalType": "uint256"}
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "EthWithdrawn",
+      "inputs": [
+        {"name": "user", "type": "address", "indexed": true, "internalType": "address"},
+        {"name": "amount", "type": "uint256", "indexed": false, "internalType": "uint256"}
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "TokenDeposited",
+      "inputs": [
+        {"name": "token", "type": "address", "indexed": true, "internalType": "address"},
+        {"name": "user", "type": "address", "indexed": true, "internalType": "address"},
+        {"name": "amount", "type": "uint256", "indexed": false, "internalType": "uint256"}
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "TokenTransferred",
+      "inputs": [
+        {"name": "token", "type": "address", "indexed": true, "internalType": "address"},
+        {"name": "from", "type": "address", "indexed": true, "internalType": "address"},
+        {"name": "to", "type": "address", "indexed": true, "internalType": "address"},
+        {"name": "amount", "type": "uint256", "indexed": false, "internalType": "uint256"}
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "TokenWithdrawn",
+      "inputs": [
+        {"name": "token", "type": "address", "indexed": true, "internalType": "address"},
+        {"name": "user", "type": "address", "indexed": true, "internalType": "address"},
+        {"name": "amount", "type": "uint256", "indexed": false, "internalType": "uint256"}
+      ],
+      "anonymous": false
+    },
+    {"type": "error", "name": "InvalidShortString", "inputs": []},
+    {"type": "error", "name": "ReentrancyGuardReentrantCall", "inputs": []},
+    {"type": "error", "name": "StringTooLong", "inputs": [{"name": "str", "type": "string", "internalType": "string"}]}
 ] as const;

@@ -51,7 +51,7 @@ contract MyTokenBankTest is Test {
     function setUp() public {
         // 部署合约
         permit2 = new Permit2();
-        bank = new MyTokenBankV4(address(permit2));
+        bank = new MyTokenBankV4();
         basicToken = new TestERC20("BasicToken", "BT", TOKEN_AMOUNT * 10);
         permitToken = new TestERC20Permit("PermitToken", "PT", TOKEN_AMOUNT * 10);
         erc1363Token = new TestERC1363("ERC1363Token", "E1363", TOKEN_AMOUNT * 10);
@@ -385,6 +385,7 @@ contract MyTokenBankTest is Test {
         // 执行Permit2存款
         vm.prank(alice);
         bank.depositWithPermit2(
+            address(permit2),
             address(basicToken),
             depositAmount,
             nonce,
@@ -417,6 +418,7 @@ contract MyTokenBankTest is Test {
         vm.prank(alice);
         vm.expectRevert();
         bank.depositWithPermit2(
+            address(permit2),
             address(basicToken),
             depositAmount,
             nonce,
@@ -477,6 +479,7 @@ contract MyTokenBankTest is Test {
         vm.prank(alice);
         vm.expectRevert(Permit2.SignatureExpired.selector);
         bank.depositWithPermit2(
+            address(permit2),
             address(basicToken),
             depositAmount,
             nonce,
@@ -495,6 +498,7 @@ contract MyTokenBankTest is Test {
         vm.prank(alice);
         vm.expectRevert("The deposit amount must be greater than 0.");
         bank.depositWithPermit2(
+            address(permit2),
             address(basicToken),
             depositAmount,
             nonce,
@@ -513,6 +517,7 @@ contract MyTokenBankTest is Test {
         vm.prank(alice);
         vm.expectRevert("The token address cannot be 0");
         bank.depositWithPermit2(
+            address(permit2),
             address(0),
             depositAmount,
             nonce,

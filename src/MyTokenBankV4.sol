@@ -22,8 +22,8 @@ contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
     // 记录合约的总以太币余额
     uint256 private _totalEthBalance;
     
-    // Permit2合约接口
-    IPermit2 public immutable permit2;
+    // Permit2合约接口 - 不再在构造函数中初始化
+    // IPermit2 public immutable permit2;
     
     // 事件：当用户存入以太币时触发
     event EthDeposited(address indexed user, uint256 amount);
@@ -53,9 +53,9 @@ contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
         "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
     );
     
-    constructor(address _permit2) EIP712("Bank", "1") {
+    constructor() EIP712("Bank", "1") {
         // 初始化EIP712
-        permit2 = IPermit2(_permit2);
+        // permit2 不再在构造函数中初始化
     }
     
     /**
@@ -199,6 +199,7 @@ contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
     
     /**
      * @dev 使用Permit2进行代币存款
+     * @param permit2Address Permit2合约地址
      * @param token 代币合约地址
      * @param amount 存款金额
      * @param nonce 用户的nonce值
@@ -206,14 +207,19 @@ contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
      * @param signature 用户的签名
      */
     function depositWithPermit2(
+        address permit2Address,
         address token,
         uint256 amount,
         uint256 nonce,
         uint256 deadline,
         bytes calldata signature
     ) external nonReentrant {
+        require(permit2Address != address(0), "Permit2 address cannot be 0");
         require(token != address(0), "The token address cannot be 0");
         require(amount > 0, "The deposit amount must be greater than 0.");
+        
+        // 创建Permit2合约实例
+        IPermit2 permit2 = IPermit2(permit2Address);
         
         // 构造SignatureTransfer结构
         IPermit2.SignatureTransfer memory signatureTransfer = IPermit2.SignatureTransfer({

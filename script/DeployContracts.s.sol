@@ -14,7 +14,7 @@ contract DeployContracts is Script {
         MyTokenV4 token = new MyTokenV4();
         MyNFTV4 nft = new MyNFTV4();
         Permit2 permit2 = new Permit2();
-        MyTokenBankV4 bank = new MyTokenBankV4(address(permit2));
+        MyTokenBankV4 bank = new MyTokenBankV4();
         MyNFTMarketV4 market = new MyNFTMarketV4(msg.sender);
         vm.stopBroadcast();
         console.logAddress(address(token));

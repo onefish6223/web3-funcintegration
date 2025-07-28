@@ -2,7 +2,7 @@ import {Button} from "@/app/components/ui/button";
 import {Input} from "@/app/components/ui/input";
 import {Label} from "@/app/components/ui/label";
 import {useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId} from "wagmi";
-import {parseEther, formatEther, isAddress} from "viem";
+import {parseEther, formatEther, isAddress, keccak256, encodePacked} from "viem";
 import {toast} from "sonner";
 import {useState, useEffect} from "react";
 import {MyNFTV4_ABI} from "@/app/abi/MyNFTV4";
@@ -80,11 +80,41 @@ export default function NFTMarketInteraction() {
   };
   
   // 状态管理
+  const [tokenId721, setTokenId721] = useState<string>("");
+  const [price721, setPrice721] = useState<string>("");
+  const [requiresWhitelist721, setRequiresWhitelist721] = useState<boolean>(false);
+  
+  const [nftContract1155, setNftContract1155] = useState<string>("");
+  const [tokenId1155, setTokenId1155] = useState<string>("");
+  const [amount1155, setAmount1155] = useState<string>("");
+  const [price1155, setPrice1155] = useState<string>("");
+  const [requiresWhitelist1155, setRequiresWhitelist1155] = useState<boolean>(false);
+  
+  const [cancelListingId, setCancelListingId] = useState<string>("");
+  const [buyListingId, setBuyListingId] = useState<string>("");
+  const [buyAmount, setBuyAmount] = useState<string>("");
+  const [buyValue, setBuyValue] = useState<string>("");
+  
+  // 白名单购买相关状态
+  const [permitListingId, setPermitListingId] = useState<string>("");
+  const [permitAmount, setPermitAmount] = useState<string>("");
+  const [permitDeadline, setPermitDeadline] = useState<string>("");
+  const [permitV, setPermitV] = useState<string>("");
+  const [permitR, setPermitR] = useState<string>("");
+  const [permitS, setPermitS] = useState<string>("");
+  
+  // 查询相关状态
   const [queryAddress, setQueryAddress] = useState("");
   const [queryTokenId, setQueryTokenId] = useState("");
   const [queryListingId, setQueryListingId] = useState("");
   const [queryNftContract, setQueryNftContract] = useState("");
   const [querySignatureHash, setQuerySignatureHash] = useState("");
+  
+  // 管理员功能状态
+  const [newSigner, setNewSigner] = useState<string>("");
+  const [newFeePercentage, setNewFeePercentage] = useState<string>("");
+  const [newFeeReceiver, setNewFeeReceiver] = useState<string>("");
+  const [newOwner, setNewOwner] = useState<string>("");
   
   // 读取合约状态
   const {data: platformFeePercentage} = useReadContract({
@@ -113,6 +143,20 @@ export default function NFTMarketInteraction() {
     abi: MyNFTMarketV4_ABI,
     functionName: "owner",
     query: { enabled: !!marketAddress && isAddress(marketAddress) },
+  });
+
+  const { data: nftName } = useReadContract({
+    address: nftAddress as `0x${string}`,
+    abi: MyNFTV4_ABI,
+    functionName: "name",
+    query: { enabled: !!nftAddress && isAddress(nftAddress) },
+  });
+
+  const { data: nftSymbol } = useReadContract({
+    address: nftAddress as `0x${string}`,
+    abi: MyNFTV4_ABI,
+    functionName: "symbol",
+    query: { enabled: !!nftAddress && isAddress(nftAddress) },
   });
   
   const {data: userNonces} = useReadContract({
@@ -147,11 +191,19 @@ export default function NFTMarketInteraction() {
     query: { enabled: !!marketAddress && isAddress(marketAddress) && !!querySignatureHash },
   });
   
+  const {data: nftListing} = useReadContract({
+    address: marketAddress as `0x${string}`,
+    abi: MyNFTMarketV4_ABI,
+    functionName: "getNFTListing",
+    args: queryNftContract && queryTokenId && isAddress(queryNftContract) ? [queryNftContract as `0x${string}`, BigInt(queryTokenId)] : undefined,
+    query: { enabled: !!marketAddress && isAddress(marketAddress) && !!queryNftContract && isAddress(queryNftContract) && !!queryTokenId },
+  });
+  
   const {data: latestListings} = useReadContract({
     address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "getLatestListings",
-    args: [BigInt(10)], // 获取最新10个listing
+    args: [BigInt(10)],
     query: { enabled: !!marketAddress && isAddress(marketAddress) },
   });
   
@@ -163,20 +215,14 @@ export default function NFTMarketInteraction() {
     query: { enabled: !!marketAddress && isAddress(marketAddress) && !!queryAddress && isAddress(queryAddress) },
   });
   
-  const {data: nftListing} = useReadContract({
-    address: marketAddress as `0x${string}`,
-    abi: MyNFTMarketV4_ABI,
-    functionName: "getNFTListing",
-    args: queryNftContract && queryTokenId && isAddress(queryNftContract) ? [queryNftContract as `0x${string}`, BigInt(queryTokenId)] : undefined,
-    query: { enabled: !!marketAddress && isAddress(marketAddress) && !!queryNftContract && isAddress(queryNftContract) && !!queryTokenId },
-  });
-  
   const {data: eip712Domain} = useReadContract({
     address: marketAddress as `0x${string}`,
     abi: MyNFTMarketV4_ABI,
     functionName: "eip712Domain",
     query: { enabled: !!marketAddress && isAddress(marketAddress) },
   });
+  
+
   
   const {data: permitTypehash} = useReadContract({
     address: marketAddress as `0x${string}`,
@@ -595,25 +641,35 @@ export default function NFTMarketInteraction() {
         <h3 className="text-lg font-semibold">购买 NFT</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label htmlFor="buyListingId" className="block text-sm font-medium">Listing ID</label>
-            <Input id="buyListingId" placeholder="输入 Listing ID" />
+            <Label htmlFor="buyListingId">Listing ID</Label>
+            <Input
+              id="buyListingId"
+              placeholder="输入 Listing ID"
+              value={buyListingId}
+              onChange={(e) => setBuyListingId(e.target.value)}
+            />
           </div>
           <div>
-            <label htmlFor="buyAmount" className="block text-sm font-medium">购买数量</label>
-            <Input id="buyAmount" placeholder="输入数量" />
+            <Label htmlFor="buyAmount">购买数量</Label>
+            <Input
+              id="buyAmount"
+              placeholder="输入购买数量"
+              value={buyAmount}
+              onChange={(e) => setBuyAmount(e.target.value)}
+            />
           </div>
           <div>
-            <label htmlFor="buyValue" className="block text-sm font-medium">支付金额 (ETH)</label>
-            <Input id="buyValue" placeholder="输入支付金额" />
+            <Label htmlFor="buyValue">支付金额 (ETH)</Label>
+            <Input
+              id="buyValue"
+              placeholder="输入支付金额"
+              value={buyValue}
+              onChange={(e) => setBuyValue(e.target.value)}
+            />
           </div>
         </div>
         <Button
-          onClick={() => {
-            const listingId = (document.getElementById("buyListingId") as HTMLInputElement).value;
-            const amount = (document.getElementById("buyAmount") as HTMLInputElement).value;
-            const value = (document.getElementById("buyValue") as HTMLInputElement).value;
-            handleBuyNFT(listingId, amount, value);
-          }}
+          onClick={() => handleBuyNFT(buyListingId, buyAmount, buyValue)}
           className="w-full"
         >
           购买 NFT
@@ -624,44 +680,66 @@ export default function NFTMarketInteraction() {
       
       {/* 白名单购买 */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold">白名单购买</h3>
+        <h3 className="text-lg font-semibold">白名单购买 (Permit Buy)</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="permitListingId" className="block text-sm font-medium">Listing ID</label>
-            <Input id="permitListingId" placeholder="输入 Listing ID" />
+            <Label htmlFor="permitListingId">Listing ID</Label>
+            <Input
+              id="permitListingId"
+              placeholder="输入 Listing ID"
+              value={permitListingId}
+              onChange={(e) => setPermitListingId(e.target.value)}
+            />
           </div>
           <div>
-            <label htmlFor="permitAmount" className="block text-sm font-medium">购买数量</label>
-            <Input id="permitAmount" placeholder="输入数量" />
+            <Label htmlFor="permitAmount">购买数量</Label>
+            <Input
+              id="permitAmount"
+              placeholder="输入购买数量"
+              value={permitAmount}
+              onChange={(e) => setPermitAmount(e.target.value)}
+            />
           </div>
           <div>
-            <label htmlFor="permitDeadline" className="block text-sm font-medium">截止时间</label>
-            <Input id="permitDeadline" placeholder="输入时间戳" />
+            <Label htmlFor="permitDeadline">截止时间 (时间戳)</Label>
+            <Input
+              id="permitDeadline"
+              placeholder="输入截止时间"
+              value={permitDeadline}
+              onChange={(e) => setPermitDeadline(e.target.value)}
+            />
           </div>
           <div>
-            <label htmlFor="permitV" className="block text-sm font-medium">签名 V</label>
-            <Input id="permitV" placeholder="输入 V 值" />
+            <Label htmlFor="permitV">签名 V</Label>
+            <Input
+              id="permitV"
+              placeholder="输入签名 V 值"
+              value={permitV}
+              onChange={(e) => setPermitV(e.target.value)}
+            />
           </div>
           <div>
-            <label htmlFor="permitR" className="block text-sm font-medium">签名 R</label>
-            <Input id="permitR" placeholder="输入 R 值" />
+            <Label htmlFor="permitR">签名 R</Label>
+            <Input
+              id="permitR"
+              placeholder="输入签名 R 值"
+              value={permitR}
+              onChange={(e) => setPermitR(e.target.value)}
+            />
           </div>
           <div>
-            <label htmlFor="permitS" className="block text-sm font-medium">签名 S</label>
-            <Input id="permitS" placeholder="输入 S 值" />
+            <Label htmlFor="permitS">签名 S</Label>
+            <Input
+              id="permitS"
+              placeholder="输入签名 S 值"
+              value={permitS}
+              onChange={(e) => setPermitS(e.target.value)}
+            />
           </div>
         </div>
         <Button
-          onClick={() => {
-            const listingId = (document.getElementById("permitListingId") as HTMLInputElement).value;
-            const amount = (document.getElementById("permitAmount") as HTMLInputElement).value;
-            const deadline = (document.getElementById("permitDeadline") as HTMLInputElement).value;
-            const v = (document.getElementById("permitV") as HTMLInputElement).value;
-            const r = (document.getElementById("permitR") as HTMLInputElement).value;
-            const s = (document.getElementById("permitS") as HTMLInputElement).value;
-            handlePermitBuy(listingId, amount, deadline, v, r, s);
-          }}
-          className="w-full"
+          onClick={() => handlePermitBuy(permitListingId, permitAmount, permitDeadline, permitV, permitR, permitS)}
+          className="w-full bg-purple-600 hover:bg-purple-700"
         >
           白名单购买
         </Button>
@@ -675,15 +753,16 @@ export default function NFTMarketInteraction() {
         
         {/* 设置签名者 */}
         <div className="space-y-2">
-          <label htmlFor="newSigner" className="block text-sm font-medium">设置签名者</label>
+          <Label htmlFor="newSigner">设置签名者</Label>
           <div className="flex gap-4">
-            <Input id="newSigner" placeholder="输入签名者地址" className="flex-1" />
-            <Button
-              onClick={() => {
-                const signerAddress = (document.getElementById("newSigner") as HTMLInputElement).value;
-                handleSetSigner(signerAddress);
-              }}
-            >
+            <Input 
+              id="newSigner" 
+              placeholder="输入签名者地址" 
+              className="flex-1"
+              value={newSigner}
+              onChange={(e) => setNewSigner(e.target.value)}
+            />
+            <Button onClick={() => handleSetSigner(newSigner)}>
               设置签名者
             </Button>
           </div>
@@ -691,15 +770,16 @@ export default function NFTMarketInteraction() {
         
         {/* 设置平台手续费 */}
         <div className="space-y-2">
-          <label htmlFor="newFeePercentage" className="block text-sm font-medium">设置平台手续费比例</label>
+          <Label htmlFor="newFeePercentage">设置平台手续费比例</Label>
           <div className="flex gap-4">
-            <Input id="newFeePercentage" placeholder="输入手续费比例" className="flex-1" />
-            <Button
-              onClick={() => {
-                const feePercentage = (document.getElementById("newFeePercentage") as HTMLInputElement).value;
-                handleSetPlatformFeePercentage(feePercentage);
-              }}
-            >
+            <Input 
+              id="newFeePercentage" 
+              placeholder="输入手续费比例" 
+              className="flex-1"
+              value={newFeePercentage}
+              onChange={(e) => setNewFeePercentage(e.target.value)}
+            />
+            <Button onClick={() => handleSetPlatformFeePercentage(newFeePercentage)}>
               设置手续费
             </Button>
           </div>
@@ -707,15 +787,16 @@ export default function NFTMarketInteraction() {
         
         {/* 设置手续费接收地址 */}
         <div className="space-y-2">
-          <label htmlFor="newFeeReceiver" className="block text-sm font-medium">设置手续费接收地址</label>
+          <Label htmlFor="newFeeReceiver">设置手续费接收地址</Label>
           <div className="flex gap-4">
-            <Input id="newFeeReceiver" placeholder="输入接收地址" className="flex-1" />
-            <Button
-              onClick={() => {
-                const receiverAddress = (document.getElementById("newFeeReceiver") as HTMLInputElement).value;
-                handleSetFeeReceiver(receiverAddress);
-              }}
-            >
+            <Input 
+              id="newFeeReceiver" 
+              placeholder="输入接收地址" 
+              className="flex-1"
+              value={newFeeReceiver}
+              onChange={(e) => setNewFeeReceiver(e.target.value)}
+            />
+            <Button onClick={() => handleSetFeeReceiver(newFeeReceiver)}>
               设置接收地址
             </Button>
           </div>
@@ -723,15 +804,16 @@ export default function NFTMarketInteraction() {
         
         {/* 转移所有权 */}
         <div className="space-y-2">
-          <label htmlFor="newOwner" className="block text-sm font-medium">转移所有权</label>
+          <Label htmlFor="newOwner">转移所有权</Label>
           <div className="flex gap-4">
-            <Input id="newOwner" placeholder="输入新所有者地址" className="flex-1" />
-            <Button
-              onClick={() => {
-                const newOwner = (document.getElementById("newOwner") as HTMLInputElement).value;
-                handleTransferOwnership(newOwner);
-              }}
-            >
+            <Input 
+              id="newOwner" 
+              placeholder="输入新所有者地址" 
+              className="flex-1"
+              value={newOwner}
+              onChange={(e) => setNewOwner(e.target.value)}
+            />
+            <Button onClick={() => handleTransferOwnership(newOwner)}>
               转移所有权
             </Button>
           </div>
@@ -749,9 +831,19 @@ export default function NFTMarketInteraction() {
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">查询功能</h3>
         
+        {/* 基本信息显示 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>当前签名者</Label>
+            <div className="p-2 bg-gray-100 rounded font-mono text-xs break-all">
+              {signer || "加载中..."}
+            </div>
+          </div>
+        </div>
+        
         {/* 查询地址输入 */}
         <div className="space-y-2">
-          <label htmlFor="queryAddressInput" className="block text-sm font-medium">查询地址</label>
+          <Label htmlFor="queryAddressInput">查询地址</Label>
           <Input
             id="queryAddressInput"
             placeholder="输入要查询的地址"
@@ -763,7 +855,7 @@ export default function NFTMarketInteraction() {
         {/* 用户 Nonces */}
         {queryAddress && isAddress(queryAddress) && (
           <div className="space-y-2">
-            <label className="block text-sm font-medium">用户 Nonces</label>
+            <Label>用户 Nonces</Label>
             <div className="p-2 bg-gray-100 rounded">
               {userNonces ? userNonces.toString() : "加载中..."}
             </div>
@@ -786,7 +878,7 @@ export default function NFTMarketInteraction() {
         
         {/* Listing 查询 */}
         <div className="space-y-2">
-          <label htmlFor="queryListingIdInput" className="block text-sm font-medium">查询 Listing ID</label>
+          <Label htmlFor="queryListingIdInput">查询 Listing ID</Label>
           <Input
             id="queryListingIdInput"
             placeholder="输入 Listing ID"
@@ -797,7 +889,7 @@ export default function NFTMarketInteraction() {
         
         {queryListingId && (
           <div className="space-y-2">
-            <label className="block text-sm font-medium">Listing 信息</label>
+            <Label>Listing 信息</Label>
             <div className="p-2 bg-gray-100 rounded max-h-40 overflow-y-auto">
               {listingInfo ? (
                 <pre className="text-xs">{JSON.stringify(listingInfo, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2)}</pre>
@@ -811,7 +903,7 @@ export default function NFTMarketInteraction() {
         {/* NFT Listing 查询 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="queryNftContractInput" className="block text-sm font-medium">NFT 合约地址</label>
+            <Label htmlFor="queryNftContractInput">NFT 合约地址</Label>
             <Input
               id="queryNftContractInput"
               placeholder="输入 NFT 合约地址"
@@ -820,7 +912,7 @@ export default function NFTMarketInteraction() {
             />
           </div>
           <div>
-            <label htmlFor="queryTokenIdInput" className="block text-sm font-medium">Token ID</label>
+            <Label htmlFor="queryTokenIdInput">Token ID</Label>
             <Input
               id="queryTokenIdInput"
               placeholder="输入 Token ID"
@@ -832,11 +924,7 @@ export default function NFTMarketInteraction() {
         
         {queryNftContract && queryTokenId && isAddress(queryNftContract) && (
           <div className="space-y-2">
-            <label className="block text-sm font-medium">NFT Listing ID</label>
-            <div className="p-2 bg-gray-100 rounded">
-              {nftListingId ? nftListingId.toString() : "加载中..."}
-            </div>
-            <label className="block text-sm font-medium">NFT Listing 信息</label>
+            <Label>NFT Listing 信息</Label>
             <div className="p-2 bg-gray-100 rounded max-h-40 overflow-y-auto">
               {nftListing ? (
                 <pre className="text-xs">{JSON.stringify(nftListing, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2)}</pre>
@@ -849,7 +937,7 @@ export default function NFTMarketInteraction() {
         
         {/* 签名查询 */}
         <div className="space-y-2">
-          <label htmlFor="querySignatureHashInput" className="block text-sm font-medium">查询签名哈希</label>
+          <Label htmlFor="querySignatureHashInput">查询签名哈希</Label>
           <Input
             id="querySignatureHashInput"
             placeholder="输入签名哈希"
@@ -860,7 +948,7 @@ export default function NFTMarketInteraction() {
         
         {querySignatureHash && (
           <div className="space-y-2">
-            <label className="block text-sm font-medium">签名是否已使用</label>
+            <Label>签名是否已使用</Label>
             <div className="p-2 bg-gray-100 rounded">
               {usedSignature !== undefined ? (usedSignature ? "已使用" : "未使用") : "加载中..."}
             </div>
@@ -869,7 +957,7 @@ export default function NFTMarketInteraction() {
         
         {/* 最新 Listings */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium">最新 Listings (前10个)</label>
+          <Label>最新 Listings (前10个)</Label>
           <div className="p-2 bg-gray-100 rounded max-h-60 overflow-y-auto">
             {latestListings ? (
               <pre className="text-xs">{JSON.stringify(latestListings, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2)}</pre>
@@ -888,7 +976,7 @@ export default function NFTMarketInteraction() {
         
         {/* EIP712 Domain */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium">EIP712 Domain</label>
+          <Label>EIP712 Domain</Label>
           <div className="p-2 bg-gray-100 rounded max-h-40 overflow-y-auto">
             {eip712Domain ? (
               <pre className="text-xs">{JSON.stringify(eip712Domain, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2)}</pre>
@@ -900,25 +988,9 @@ export default function NFTMarketInteraction() {
         
         {/* Permit Typehash */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium">Permit Typehash</label>
+          <Label>Permit Typehash</Label>
           <div className="p-2 bg-gray-100 rounded font-mono text-xs break-all">
             {permitTypehash || "加载中..."}
-          </div>
-        </div>
-        
-        {/* 测试哈希函数 */}
-        <div className="space-y-2">
-          <label htmlFor="testStructHash" className="block text-sm font-medium">测试哈希函数</label>
-          <div className="flex gap-4">
-            <Input id="testStructHash" placeholder="输入结构哈希" className="flex-1" />
-            <Button
-              onClick={() => {
-                const structHash = (document.getElementById("testStructHash") as HTMLInputElement).value;
-                handleHashTypedDataV4(structHash);
-              }}
-            >
-              计算哈希
-            </Button>
           </div>
         </div>
       </div>
