@@ -281,12 +281,12 @@ contract Permit2Test is Test {
         permit2.approve(address(0), spender, APPROVE_AMOUNT, expiration);
     }
     
-    function testGetVersion() public {
+    function testGetVersion() public view {
         string memory version = permit2.version();
         assertEq(version, "1");
     }
     
-    function testDomainSeparator() public {
+    function testDomainSeparator() public view {
         bytes32 domainSeparator = permit2.DOMAIN_SEPARATOR();
         assertTrue(domainSeparator != bytes32(0));
     }

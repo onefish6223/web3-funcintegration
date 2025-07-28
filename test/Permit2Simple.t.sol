@@ -124,7 +124,7 @@ contract Permit2SimpleTest is Test {
         assertFalse(permit2.isNonceUsed(owner, 1));
     }
     
-    function testContractInfo() public {
+    function testContractInfo() public view {
         // 测试版本
         string memory version = permit2.version();
         assertEq(version, "1");

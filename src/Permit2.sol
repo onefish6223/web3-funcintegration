@@ -916,7 +916,7 @@ contract Permit2 is EIP712, ReentrancyGuard, Ownable {
      * 
      * 注意：当前实现为空函数，需要根据实际需求进行扩展
      */
-    function emergencyPause() external {
+    function emergencyPause() external pure {
         // 预留的紧急暂停功能
         // 实际实现需要继承Pausable和Ownable合约
         // 示例实现：
