@@ -244,6 +244,44 @@ export default function TokenBankInteraction() {
       toast.error("Permit 存款失败");
     }
   };
+
+  // 使用 Permit2 存款代币
+  const handleDepositWithPermit2 = async (
+    permit2Addr: string,
+    tokenAddr: string, 
+    amount: string, 
+    nonce: string, 
+    deadline: string, 
+    signature: string
+  ) => {
+    if (!isConnected) return toast.error("请连接钱包");
+    if (!permit2Addr || !tokenAddr || !amount || !nonce || !deadline || !signature) {
+      return toast.error("请填写完整信息");
+    }
+    if (!isAddress(permit2Addr)) return toast.error("无效的Permit2地址");
+    if (!isAddress(tokenAddr)) return toast.error("无效的代币地址");
+    
+    try {
+      writeContract({
+        address: bankAddress as `0x${string}`,
+        abi: MyTokenBankV4_ABI,
+        functionName: "depositWithPermit2",
+        args: [
+          permit2Addr as `0x${string}`,
+          tokenAddr as `0x${string}`, 
+          parseEther(amount), 
+          BigInt(nonce), 
+          BigInt(deadline), 
+          signature as `0x${string}`
+        ],
+        chainId: 31337,
+      });
+      toast.success("Permit2 存款已发起");
+    } catch (error) {
+      console.error("Permit2 存款失败:", error);
+      toast.error("Permit2 存款失败");
+    }
+  };
   
   // 代币取款
   const handleWithdrawToken = async (tokenAddr: string, amount: string) => {
@@ -550,6 +588,69 @@ export default function TokenBankInteraction() {
       
       <hr className="border-gray-200" />
       
+      {/* Permit2 存款 */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Permit2 存款</h3>
+        <div className="text-sm text-gray-600 mb-4">
+          使用 Uniswap Permit2 协议进行代币存款，支持更灵活的授权机制
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="permit2Address" className="block text-sm font-medium">Permit2 合约地址</label>
+            <Input 
+              id="permit2Address" 
+              placeholder="0x000000000022D473030F116dDEE9F6B43aC78BA3" 
+              defaultValue="0x000000000022D473030F116dDEE9F6B43aC78BA3"
+            />
+          </div>
+          <div>
+            <label htmlFor="permit2TokenAddr" className="block text-sm font-medium">代币合约地址</label>
+            <Input id="permit2TokenAddr" placeholder="代币合约地址" defaultValue={tokenAddress} />
+          </div>
+          <div>
+            <label htmlFor="permit2Amount" className="block text-sm font-medium">存款金额</label>
+            <Input id="permit2Amount" placeholder="存款金额" />
+          </div>
+          <div>
+            <label htmlFor="permit2Nonce" className="block text-sm font-medium">Nonce</label>
+            <Input id="permit2Nonce" placeholder="用户 nonce 值" />
+          </div>
+          <div>
+            <label htmlFor="permit2Deadline" className="block text-sm font-medium">截止时间</label>
+            <Input id="permit2Deadline" placeholder="时间戳" />
+          </div>
+          <div>
+            <label htmlFor="permit2Signature" className="block text-sm font-medium">签名数据</label>
+            <Input id="permit2Signature" placeholder="0x..." />
+          </div>
+        </div>
+        <Button
+          onClick={() => {
+            const permit2Addr = (document.getElementById("permit2Address") as HTMLInputElement).value;
+            const tokenAddr = (document.getElementById("permit2TokenAddr") as HTMLInputElement).value;
+            const amount = (document.getElementById("permit2Amount") as HTMLInputElement).value;
+            const nonce = (document.getElementById("permit2Nonce") as HTMLInputElement).value;
+            const deadline = (document.getElementById("permit2Deadline") as HTMLInputElement).value;
+            const signature = (document.getElementById("permit2Signature") as HTMLInputElement).value;
+            handleDepositWithPermit2(permit2Addr, tokenAddr, amount, nonce, deadline, signature);
+          }}
+          className="w-full"
+        >
+          Permit2 存款
+        </Button>
+        
+        {/* Permit2 使用说明 */}
+        <div className="p-4 bg-blue-50 rounded text-sm space-y-2">
+          <p><strong>Permit2 说明：</strong></p>
+          <p>• Permit2 是 Uniswap 开发的通用代币授权协议</p>
+          <p>• 支持批量操作、过期时间控制和更安全的授权机制</p>
+          <p>• 需要先构建符合 EIP-712 标准的签名数据</p>
+          <p>• 可以使用"签名构建器" tab 来生成所需的签名数据</p>
+        </div>
+      </div>
+      
+      <hr className="border-gray-200" />
+      
       {/* 查询功能 */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">查询功能</h3>
@@ -622,8 +723,10 @@ export default function TokenBankInteraction() {
             <p><strong>以太币操作：</strong>支持直接存入、取出和转账以太币</p>
             <p><strong>代币操作：</strong>支持 ERC20 代币的存入、取出和转账</p>
             <p><strong>ERC20Permit：</strong>支持使用签名授权的代币存款，无需预先调用 approve</p>
+            <p><strong>Permit2：</strong>支持 Uniswap Permit2 协议的代币存款，提供更灵活的授权机制</p>
             <p><strong>ERC1363：</strong>合约支持 ERC1363 代币的直接转账存款（通过 onTransferReceived 回调）</p>
             <p><strong>查询功能：</strong>可查询任意地址在银行中的以太币和代币余额</p>
+            <p><strong>签名构建器：</strong>可使用"签名构建器" tab 生成 ERC20Permit 和 Permit2 所需的签名数据</p>
           </div>
         </div>
        </div>
