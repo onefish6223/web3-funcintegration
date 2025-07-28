@@ -17,7 +17,7 @@ export const wagmiAdapter = new WagmiAdapter({
   networks
 })
 
-export const NFT_ADDRESS = "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0";
-export const NFT_MARKET_ADDRESS = "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0";
-export const TOKEN_ADDRESS = "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512";
-export const TOKEN_BANK_ADDRESS = "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0";
+export const LOCAL_NFT_ADDRESS = "0x5fc8d32690cc91d4c39d9d3abcbd16989f875707";
+export const LOCAL_NFT_MARKET_ADDRESS = "0xa513e6e4b8f2a923d98304ec87f64353c4d5c853";
+export const LOCAL_TOKEN_ADDRESS = "0xdc64a140aa3e981100a9beca4e685f962f0cf6c9";
+export const LOCAL_TOKEN_BANK_ADDRESS = "0x0165878a594ca255338adfa4d48449f69242eb8f";

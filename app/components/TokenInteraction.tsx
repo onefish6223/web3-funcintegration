@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
 import { parseEther, formatEther, isAddress } from 'viem';
 import { toast } from 'sonner';
 import { MyTokenV4_ABI } from '../abi/MyTokenV4';
@@ -11,13 +11,32 @@ import { Badge } from './ui/badge';
 import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { Textarea } from './ui/textarea';
+import { LOCAL_TOKEN_ADDRESS } from '@/app/config';
 
 export default function TokenInteraction() {
   const { address, isConnected } = useAccount();
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+  const chainId = useChainId();
   
-  const tokenAddress = "0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519" as const;
+  // 不同链的默认合约地址
+  const defaultTokenAddresses: Record<number, string> = {
+    1: "0x1b73C5498c1E3b4dbA84de0F1833c4a029d90519", // Mainnet
+    42161: "0x4273C5498c1E3b4dbA84de0F1833c4a029d90519", // Arbitrum
+    11155111: "0x1173C5498c1E3b4dbA84de0F1833c4a029d90519", // Sepolia
+    31337: LOCAL_TOKEN_ADDRESS, // Anvil
+  };
+  
+  const [tokenAddress, setTokenAddress] = useState<string>(defaultTokenAddresses[chainId] || "");
+  const [inputTokenAddress, setInputTokenAddress] = useState<string>("");
+  
+  // 当链切换时更新默认地址
+  useEffect(() => {
+    const defaultAddress = defaultTokenAddresses[chainId];
+    if (defaultAddress != tokenAddress) {
+      setTokenAddress(defaultAddress);
+    }
+  }, [chainId]);
 
   // 状态管理
   const [transferTo, setTransferTo] = useState('');
@@ -45,82 +64,115 @@ export default function TokenInteraction() {
 
 
 
+  // 设置合约地址的函数
+  const handleSetTokenAddress = () => {
+    if (!inputTokenAddress) {
+      toast.error('请输入合约地址');
+      return;
+    }
+    if (!isAddress(inputTokenAddress)) {
+      toast.error('请输入有效的合约地址');
+      return;
+    }
+    setTokenAddress(inputTokenAddress);
+    toast.success('合约地址已更新');
+  };
+
+  // 重置为默认地址的函数
+  const handleResetToDefault = () => {
+    const defaultAddress = defaultTokenAddresses[chainId];
+    if (defaultAddress) {
+      setTokenAddress(defaultAddress);
+      setInputTokenAddress('');
+      toast.success('已重置为默认合约地址');
+    } else {
+      toast.error('当前链没有配置默认合约地址');
+    }
+  };
+
   // 读取合约数据
   const { data: tokenName } = useReadContract({
-    address: tokenAddress,
+    address: tokenAddress && isAddress(tokenAddress) ? tokenAddress as `0x${string}` : undefined,
     abi: MyTokenV4_ABI,
     functionName: 'name',
+    query: { enabled: !!tokenAddress && isAddress(tokenAddress) },
   });
 
   const { data: tokenSymbol } = useReadContract({
-    address: tokenAddress,
+    address: tokenAddress && isAddress(tokenAddress) ? tokenAddress as `0x${string}` : undefined,
     abi: MyTokenV4_ABI,
     functionName: 'symbol',
+    query: { enabled: !!tokenAddress && isAddress(tokenAddress) },
   });
 
   const { data: tokenDecimals } = useReadContract({
-    address: tokenAddress,
+    address: tokenAddress && isAddress(tokenAddress) ? tokenAddress as `0x${string}` : undefined,
     abi: MyTokenV4_ABI,
     functionName: 'decimals',
+    query: { enabled: !!tokenAddress && isAddress(tokenAddress) },
   });
 
   const { data: totalSupply } = useReadContract({
-    address: tokenAddress,
+    address: tokenAddress && isAddress(tokenAddress) ? tokenAddress as `0x${string}` : undefined,
     abi: MyTokenV4_ABI,
     functionName: 'totalSupply',
+    query: { enabled: !!tokenAddress && isAddress(tokenAddress) },
   });
 
   const { data: userBalance } = useReadContract({
-    address: tokenAddress,
+    address: tokenAddress && isAddress(tokenAddress) ? tokenAddress as `0x${string}` : undefined,
     abi: MyTokenV4_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
+    query: { enabled: !!tokenAddress && isAddress(tokenAddress) && !!address },
   });
 
   const { data: queryBalance } = useReadContract({
-    address: tokenAddress,
+    address: tokenAddress && isAddress(tokenAddress) ? tokenAddress as `0x${string}` : undefined,
     abi: MyTokenV4_ABI,
     functionName: 'balanceOf',
     args: queryAddress && isAddress(queryAddress) ? [queryAddress as `0x${string}`] : undefined,
-    query: { enabled: !!queryAddress && isAddress(queryAddress) },
+    query: { enabled: !!tokenAddress && isAddress(tokenAddress) && !!queryAddress && isAddress(queryAddress) },
   });
 
   const { data: allowanceAmount } = useReadContract({
-    address: tokenAddress,
+    address: tokenAddress && isAddress(tokenAddress) ? tokenAddress as `0x${string}` : undefined,
     abi: MyTokenV4_ABI,
     functionName: 'allowance',
     args: ownerAddress && spenderAddress && isAddress(ownerAddress) && isAddress(spenderAddress) 
       ? [ownerAddress as `0x${string}`, spenderAddress as `0x${string}`] 
       : undefined,
-    query: { enabled: !!ownerAddress && !!spenderAddress && isAddress(ownerAddress) && isAddress(spenderAddress) },
+    query: { enabled: !!tokenAddress && isAddress(tokenAddress) && !!ownerAddress && !!spenderAddress && isAddress(ownerAddress) && isAddress(spenderAddress) },
   });
 
   const { data: domainSeparator } = useReadContract({
-    address: tokenAddress,
+    address: tokenAddress && isAddress(tokenAddress) ? tokenAddress as `0x${string}` : undefined,
     abi: MyTokenV4_ABI,
     functionName: 'DOMAIN_SEPARATOR',
+    query: { enabled: !!tokenAddress && isAddress(tokenAddress) },
   });
 
   const { data: nonces } = useReadContract({
-    address: tokenAddress,
+    address: tokenAddress && isAddress(tokenAddress) ? tokenAddress as `0x${string}` : undefined,
     abi: MyTokenV4_ABI,
     functionName: 'nonces',
     args: nonceAddress && isAddress(nonceAddress) ? [nonceAddress as `0x${string}`] : undefined,
-    query: { enabled: !!nonceAddress && isAddress(nonceAddress) },
+    query: { enabled: !!tokenAddress && isAddress(tokenAddress) && !!nonceAddress && isAddress(nonceAddress) },
   });
 
   const { data: supportsInterface } = useReadContract({
-    address: tokenAddress,
+    address: tokenAddress && isAddress(tokenAddress) ? tokenAddress as `0x${string}` : undefined,
     abi: MyTokenV4_ABI,
     functionName: 'supportsInterface',
     args: interfaceId ? [interfaceId as `0x${string}`] : undefined,
-    query: { enabled: !!interfaceId && interfaceId.startsWith('0x') && interfaceId.length === 10 },
+    query: { enabled: !!tokenAddress && isAddress(tokenAddress) && !!interfaceId && interfaceId.startsWith('0x') && interfaceId.length === 10 },
   });
 
   const { data: eip712Domain } = useReadContract({
-    address: tokenAddress,
+    address: tokenAddress && isAddress(tokenAddress) ? tokenAddress as `0x${string}` : undefined,
     abi: MyTokenV4_ABI,
     functionName: 'eip712Domain',
+    query: { enabled: !!tokenAddress && isAddress(tokenAddress) },
   });
 
   useEffect(() => {
@@ -140,7 +192,7 @@ export default function TokenInteraction() {
       return;
     }
     writeContract({
-      address: tokenAddress,
+      address: tokenAddress as `0x${string}`,
       abi: MyTokenV4_ABI,
       functionName: 'transfer',
       args: [transferTo as `0x${string}`, parseEther(transferAmount)],
@@ -158,7 +210,7 @@ export default function TokenInteraction() {
       return;
     }
     writeContract({
-      address: tokenAddress,
+      address: tokenAddress as `0x${string}`,
       abi: MyTokenV4_ABI,
       functionName: 'approve',
       args: [approveSpender as `0x${string}`, parseEther(approveAmount)],
@@ -176,7 +228,7 @@ export default function TokenInteraction() {
       return;
     }
     writeContract({
-      address: tokenAddress,
+      address: tokenAddress as `0x${string}`,
       abi: MyTokenV4_ABI,
       functionName: 'transferFrom',
       args: [transferFromFrom as `0x${string}`, transferFromTo as `0x${string}`, parseEther(transferFromAmount)],
@@ -195,14 +247,14 @@ export default function TokenInteraction() {
     }
     if (transferData) {
       writeContract({
-        address: tokenAddress,
+        address: tokenAddress as `0x${string}`,
         abi: MyTokenV4_ABI,
         functionName: 'transferAndCall',
         args: [transferTo as `0x${string}`, parseEther(transferAmount), transferData as `0x${string}`],
       });
     } else {
       writeContract({
-        address: tokenAddress,
+        address: tokenAddress as `0x${string}`,
         abi: MyTokenV4_ABI,
         functionName: 'transferAndCall',
         args: [transferTo as `0x${string}`, parseEther(transferAmount)],
@@ -222,14 +274,14 @@ export default function TokenInteraction() {
     }
     if (transferData) {
       writeContract({
-        address: tokenAddress,
+        address: tokenAddress as `0x${string}`,
         abi: MyTokenV4_ABI,
         functionName: 'approveAndCall',
         args: [approveSpender as `0x${string}`, parseEther(approveAmount), transferData as `0x${string}`],
       });
     } else {
       writeContract({
-        address: tokenAddress,
+        address: tokenAddress as `0x${string}`,
         abi: MyTokenV4_ABI,
         functionName: 'approveAndCall',
         args: [approveSpender as `0x${string}`, parseEther(approveAmount)],
@@ -249,14 +301,14 @@ export default function TokenInteraction() {
     }
     if (transferData) {
       writeContract({
-        address: tokenAddress,
+        address: tokenAddress as `0x${string}`,
         abi: MyTokenV4_ABI,
         functionName: 'transferFromAndCall',
         args: [transferFromFrom as `0x${string}`, transferFromTo as `0x${string}`, parseEther(transferFromAmount), transferData as `0x${string}`],
       });
     } else {
       writeContract({
-        address: tokenAddress,
+        address: tokenAddress as `0x${string}`,
         abi: MyTokenV4_ABI,
         functionName: 'transferFromAndCall',
         args: [transferFromFrom as `0x${string}`, transferFromTo as `0x${string}`, parseEther(transferFromAmount)],
@@ -275,7 +327,7 @@ export default function TokenInteraction() {
       return;
     }
     writeContract({
-      address: tokenAddress,
+      address: tokenAddress as `0x${string}`,
       abi: MyTokenV4_ABI,
       functionName: 'permit',
       args: [
@@ -300,6 +352,50 @@ export default function TokenInteraction() {
         </Badge>
         {isConfirming && <Badge>⏳ 交易确认中</Badge>}
         {isConfirmed && <Badge>✅ 交易已确认</Badge>}
+      </div>
+
+      {/* 合约地址设置 */}
+      <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+        <h3 className="text-lg font-semibold">🔧 合约地址设置</h3>
+        <div className="space-y-2">
+          <Label htmlFor="currentTokenAddress">当前合约地址</Label>
+          <Input
+            id="currentTokenAddress"
+            value={tokenAddress}
+            readOnly
+            className="bg-gray-100"
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2 space-y-2">
+            <Label htmlFor="inputTokenAddress">新合约地址</Label>
+            <Input
+              id="inputTokenAddress"
+              placeholder="输入新的合约地址"
+              value={inputTokenAddress}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputTokenAddress(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2 items-end">
+            <Button 
+              onClick={handleSetTokenAddress}
+              className="flex-1"
+            >
+              设置地址
+            </Button>
+            <Button 
+              onClick={handleResetToDefault}
+              variant="outline"
+              className="flex-1"
+            >
+              重置默认
+            </Button>
+          </div>
+        </div>
+        <div className="text-sm text-gray-600">
+          <p>当前链ID: {chainId}</p>
+          <p>默认地址: {defaultTokenAddresses[chainId] || '未配置'}</p>
+        </div>
       </div>
 
       <div className="space-y-6">
