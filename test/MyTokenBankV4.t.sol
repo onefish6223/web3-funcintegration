@@ -3,6 +3,8 @@ pragma solidity ^0.8.29;
 
 import "forge-std/Test.sol";
 import "../src/MyTokenBankV4.sol";
+import "../src/Permit2.sol";
+import "../src/IPermit2.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
@@ -31,6 +33,7 @@ contract TestERC1363 is ERC1363 {
 
 contract MyTokenBankTest is Test {
     MyTokenBankV4 public bank;
+    Permit2 public permit2;
     TestERC20 public basicToken;         // 基础 ERC20
     TestERC20Permit public permitToken;  // 带 Permit 的 ERC20
     TestERC1363 public erc1363Token;     // ERC1363 代币
@@ -47,7 +50,8 @@ contract MyTokenBankTest is Test {
 
     function setUp() public {
         // 部署合约
-        bank = new MyTokenBankV4();
+        permit2 = new Permit2();
+        bank = new MyTokenBankV4(address(permit2));
         basicToken = new TestERC20("BasicToken", "BT", TOKEN_AMOUNT * 10);
         permitToken = new TestERC20Permit("PermitToken", "PT", TOKEN_AMOUNT * 10);
         erc1363Token = new TestERC1363("ERC1363Token", "E1363", TOKEN_AMOUNT * 10);
@@ -311,6 +315,209 @@ contract MyTokenBankTest is Test {
         // 禁止转账给零地址
         vm.prank(alice);
         vm.expectRevert("The receiving address cannot be 0");
-        bank.transferEth(address(0), ETH_AMOUNT / 2);
+        bank.transferEth(address(0), ETH_AMOUNT);
+    }
+
+    // ------------------------------ Permit2功能测试 ------------------------------
+    function testDepositWithPermit2() public {
+         uint256 depositAmount = 100e18;
+         uint256 nonce = 0;
+         uint256 deadline = block.timestamp + 1 hours;
+         
+         // 首先alice需要给Permit2合约授权代币
+         vm.prank(alice);
+         basicToken.approve(address(permit2), depositAmount);
+         
+         // 构造SignatureTransfer结构
+         IPermit2.SignatureTransfer memory signatureTransfer = IPermit2.SignatureTransfer({
+             token: address(basicToken),
+             from: alice,
+             transfer: IPermit2.SignatureTransferDetails({
+                 to: address(bank),
+                 requestedAmount: depositAmount
+             }),
+             nonce: nonce,
+             deadline: deadline
+         });
+        
+        // 构造EIP712签名数据
+        bytes32 transferHash = keccak256(
+            abi.encode(
+                permit2.SIGNATURE_TRANSFER_DETAILS_TYPEHASH(),
+                signatureTransfer.transfer.to,
+                signatureTransfer.transfer.requestedAmount
+            )
+        );
+        
+        bytes32 structHash = keccak256(
+            abi.encode(
+                permit2.SIGNATURE_TRANSFER_TYPEHASH(),
+                signatureTransfer.token,
+                signatureTransfer.from,
+                transferHash,
+                signatureTransfer.nonce,
+                signatureTransfer.deadline
+            )
+        );
+        
+        bytes32 domainSeparator = permit2.DOMAIN_SEPARATOR();
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                domainSeparator,
+                structHash
+            )
+        );
+        
+        // 使用alice的私钥签名
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePrivateKey, digest);
+        bytes memory signature = abi.encodePacked(r, s, v);
+        
+        // 记录转账前的余额
+        uint256 aliceBalanceBefore = basicToken.balanceOf(alice);
+        uint256 bankBalanceBefore = basicToken.balanceOf(address(bank));
+        uint256 aliceBankBalanceBefore = bank.getTokenBalance(address(basicToken), alice);
+        
+        // 验证事件
+        vm.expectEmit(true, true, false, true);
+        emit MyTokenBankV4.TokenDeposited(address(basicToken), alice, depositAmount);
+        
+        // 执行Permit2存款
+        vm.prank(alice);
+        bank.depositWithPermit2(
+            address(basicToken),
+            depositAmount,
+            nonce,
+            deadline,
+            signature
+        );
+        
+        // 验证余额变化
+        assertEq(basicToken.balanceOf(alice), aliceBalanceBefore - depositAmount);
+        assertEq(basicToken.balanceOf(address(bank)), bankBalanceBefore + depositAmount);
+        assertEq(bank.getTokenBalance(address(basicToken), alice), aliceBankBalanceBefore + depositAmount);
+        
+        // 验证nonce已被使用
+        assertTrue(permit2.isNonceUsed(alice, nonce));
+    }
+    
+    function testDepositWithPermit2InvalidSignature() public {
+        uint256 depositAmount = 100e18;
+        uint256 nonce = 0;
+        uint256 deadline = block.timestamp + 1 hours;
+        
+        // 使用错误的签名
+        bytes memory invalidSignature = abi.encodePacked(
+            bytes32(0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef),
+            bytes32(0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321),
+            uint8(27)
+        );
+        
+        // 期望交易失败（ECDSA会检测到无效的s值）
+        vm.prank(alice);
+        vm.expectRevert();
+        bank.depositWithPermit2(
+            address(basicToken),
+            depositAmount,
+            nonce,
+            deadline,
+            invalidSignature
+        );
+    }
+    
+    function testDepositWithPermit2ExpiredSignature() public {
+        uint256 depositAmount = 100e18;
+        uint256 nonce = 0;
+        uint256 deadline = block.timestamp - 1; // 已过期
+        
+        // 构造过期的签名
+        Permit2.SignatureTransfer memory signatureTransfer = Permit2.SignatureTransfer({
+            token: address(basicToken),
+            from: alice,
+            transfer: Permit2.SignatureTransferDetails({
+                to: address(bank),
+                requestedAmount: depositAmount
+            }),
+            nonce: nonce,
+            deadline: deadline
+        });
+        
+        bytes32 transferHash = keccak256(
+            abi.encode(
+                permit2.SIGNATURE_TRANSFER_DETAILS_TYPEHASH(),
+                signatureTransfer.transfer.to,
+                signatureTransfer.transfer.requestedAmount
+            )
+        );
+        
+        bytes32 structHash = keccak256(
+            abi.encode(
+                permit2.SIGNATURE_TRANSFER_TYPEHASH(),
+                signatureTransfer.token,
+                signatureTransfer.from,
+                transferHash,
+                signatureTransfer.nonce,
+                signatureTransfer.deadline
+            )
+        );
+        
+        bytes32 domainSeparator = permit2.DOMAIN_SEPARATOR();
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                domainSeparator,
+                structHash
+            )
+        );
+        
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(alicePrivateKey, digest);
+        bytes memory signature = abi.encodePacked(r, s, v);
+        
+        // 期望交易因签名过期而失败
+        vm.prank(alice);
+        vm.expectRevert(Permit2.SignatureExpired.selector);
+        bank.depositWithPermit2(
+            address(basicToken),
+            depositAmount,
+            nonce,
+            deadline,
+            signature
+        );
+    }
+    
+    function testDepositWithPermit2ZeroAmount() public {
+        uint256 depositAmount = 0;
+        uint256 nonce = 0;
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory signature = "";
+        
+        // 期望交易因金额为0而失败
+        vm.prank(alice);
+        vm.expectRevert("The deposit amount must be greater than 0.");
+        bank.depositWithPermit2(
+            address(basicToken),
+            depositAmount,
+            nonce,
+            deadline,
+            signature
+        );
+    }
+    
+    function testDepositWithPermit2ZeroToken() public {
+        uint256 depositAmount = 100e18;
+        uint256 nonce = 0;
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory signature = "";
+        
+        // 期望交易因代币地址为0而失败
+        vm.prank(alice);
+        vm.expectRevert("The token address cannot be 0");
+        bank.depositWithPermit2(
+            address(0),
+            depositAmount,
+            nonce,
+            deadline,
+            signature
+        );
     }
 }

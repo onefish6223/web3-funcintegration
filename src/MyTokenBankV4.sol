@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/interfaces/IERC1363.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import "./IPermit2.sol";
 
 /**
  * @title MyTokenBankV4
@@ -20,6 +21,9 @@ contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
     
     // 记录合约的总以太币余额
     uint256 private _totalEthBalance;
+    
+    // Permit2合约接口
+    IPermit2 public immutable permit2;
     
     // 事件：当用户存入以太币时触发
     event EthDeposited(address indexed user, uint256 amount);
@@ -49,8 +53,9 @@ contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
         "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
     );
     
-    constructor() EIP712("Bank", "1") {
+    constructor(address _permit2) EIP712("Bank", "1") {
         // 初始化EIP712
+        permit2 = IPermit2(_permit2);
     }
     
     /**
@@ -185,6 +190,48 @@ contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
         // 转移代币到合约
         bool success = erc20.transferFrom(msg.sender, address(this), amount);
         require(success, "Token transfer failed");
+        
+        // 更新余额
+        _tokenBalances[token][msg.sender] += amount;
+        
+        emit TokenDeposited(token, msg.sender, amount);
+    }
+    
+    /**
+     * @dev 使用Permit2进行代币存款
+     * @param token 代币合约地址
+     * @param amount 存款金额
+     * @param nonce 用户的nonce值
+     * @param deadline 签名有效期
+     * @param signature 用户的签名
+     */
+    function depositWithPermit2(
+        address token,
+        uint256 amount,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) external nonReentrant {
+        require(token != address(0), "The token address cannot be 0");
+        require(amount > 0, "The deposit amount must be greater than 0.");
+        
+        // 构造SignatureTransfer结构
+        IPermit2.SignatureTransfer memory signatureTransfer = IPermit2.SignatureTransfer({
+            token: token,
+            from: msg.sender,
+            transfer: IPermit2.SignatureTransferDetails({
+                to: address(this),
+                requestedAmount: amount
+            }),
+            nonce: nonce,
+            deadline: deadline
+        });
+        
+        // 使用Permit2进行转账
+        permit2.permitTransferFrom(
+            signatureTransfer,
+            signature
+        );
         
         // 更新余额
         _tokenBalances[token][msg.sender] += amount;
