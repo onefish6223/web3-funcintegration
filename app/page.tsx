@@ -7,18 +7,20 @@ import NFTInteraction from './components/NFTInteraction'
 import { useState } from 'react'
 import Permit2Interaction from './components/Permit2Interaction'
 import SignatureBuilder from './components/SignatureBuilder'
+import TransferHistory from './components/TransferHistory'
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('token')
+  const [activeTab, setActiveTab] = useState('history')
 
   const tabs = [
-    { id: 'token', name: '代币交互', component: <TokenInteraction /> },
-    { id: 'bank', name: '代币银行', component: <TokenBankInteraction /> },
-    { id: 'nft', name: 'NFT 交互', component: <NFTInteraction /> },
-    { id: 'market', name: 'NFT 市场', component: <NFTMarketInteraction /> },
-    { id: 'permit2', name: 'Permit2', component: <Permit2Interaction /> },
-    { id: 'signature', name: '签名构建器', component: <SignatureBuilder /> },
-  ]
+      { id: 'token', name: 'Token', component: <TokenInteraction /> },
+      { id: 'nft', name: 'NFT', component: <NFTInteraction /> },
+      { id: 'bank', name: 'Token Bank', component: <TokenBankInteraction /> },
+      { id: 'market', name: 'NFT Market', component: <NFTMarketInteraction /> },
+      { id: 'permit2', name: 'Permit2', component: <Permit2Interaction /> },
+      { id: 'signature', name: '签名构建器', component: <SignatureBuilder /> },
+      { id: 'history', name: '转账历史', component: <TransferHistory /> },
+    ]
 
   return (
     <>
@@ -96,6 +98,7 @@ export default function Home() {
               {activeTab === 'market' && 'NFT 市场交易平台，支持上架、购买、取消等操作'}
               {activeTab === 'permit2' && '与Permit2 交互，统一的接口来管理 ERC20 代币的授权，支持签名授权、批量操作和安全的代币转账'}
               {activeTab === 'signature' && '签名构建器工具，支持构建和验证各种类型的数字签名'}
+              {activeTab === 'history' && '查看和管理转账历史记录，包括代币和NFT的转账详情'}
             </p>
           </div>
 
