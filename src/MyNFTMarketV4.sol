@@ -20,7 +20,7 @@ contract MyNFTMarketV4 is ReentrancyGuard, Ownable, EIP712 {
     uint256 private _listingIdCounter;
     
     // 平台手续费比例（万分比，100 = 1%）
-    uint256 public platformFeePercentage = 0; // 默认2%
+    uint256 public platformFeePercentage; // 默认0%
     
     // 平台手续费接收地址
     address public feeReceiver;
@@ -37,18 +37,18 @@ contract MyNFTMarketV4 is ReentrancyGuard, Ownable, EIP712 {
         ERC1155
     }
     
-    // NFT Listing结构体
+    // NFT Listing结构体 - 优化存储布局
     struct Listing {
         uint256 id;             // listing ID
-        address nftContract;    // NFT合约地址
+        address nftContract;    // NFT合约地址 (20 bytes)
+        address seller;         // 卖家地址 (20 bytes)
+        address buyer;          // 买家地址（未售出为address(0)） (20 bytes)
         uint256 tokenId;        // NFT token ID
-        TokenType tokenType;    // 代币类型
-        address seller;         // 卖家地址
-        address buyer;          // 买家地址（未售出为address(0)）
         uint256 price;          // 单价（以wei为单位）
         uint256 amount;         // 数量（仅ERC1155使用）
-        bool active;            // 是否有效（未售出且未取消）
-        bool requiresWhitelist; // 是否需要白名单才能购买
+        TokenType tokenType;    // 代币类型 (1 byte)
+        bool active;            // 是否有效（未售出且未取消） (1 byte)
+        bool requiresWhitelist; // 是否需要白名单才能购买 (1 byte)
     }
     
     // 存储所有listings：listing ID => Listing
@@ -161,22 +161,21 @@ contract MyNFTMarketV4 is ReentrancyGuard, Ownable, EIP712 {
         // 生成新的listing ID
         uint256 listingId = _listingIdCounter++;
         
-        // 创建新的listing（ERC721数量固定为1）
-        listings[listingId] = Listing({
-            id: listingId,
-            nftContract: nftContract,
-            tokenId: tokenId,
-            tokenType: TokenType.ERC721,
-            seller: msg.sender,
-            buyer: address(0),
-            price: price,
-            amount: 1,
-            active: true,
-            requiresWhitelist: requiresWhitelist
-        });
-        
         // 记录NFT对应的listing ID
         nftToListingId[nftContract][tokenId] = listingId;
+        
+        // 创建新的listing（ERC721数量固定为1）- 优化存储布局
+        Listing storage listing = listings[listingId];
+        listing.id = listingId;
+        listing.nftContract = nftContract;
+        listing.seller = msg.sender;
+        listing.buyer = address(0);
+        listing.tokenId = tokenId;
+        listing.price = price;
+        listing.amount = 1;
+        listing.tokenType = TokenType.ERC721;
+        listing.active = true;
+        listing.requiresWhitelist = requiresWhitelist;
         
         emit ListingCreated(
             listingId,
@@ -221,22 +220,21 @@ contract MyNFTMarketV4 is ReentrancyGuard, Ownable, EIP712 {
         // 生成新的listing ID
         uint256 listingId = _listingIdCounter++;
         
-        // 创建新的listing
-        listings[listingId] = Listing({
-            id: listingId,
-            nftContract: nftContract,
-            tokenId: tokenId,
-            tokenType: TokenType.ERC1155,
-            seller: msg.sender,
-            buyer: address(0),
-            price: price,
-            amount: amount,
-            active: true,
-            requiresWhitelist: requiresWhitelist
-        });
-        
         // 记录NFT对应的listing ID
         nftToListingId[nftContract][tokenId] = listingId;
+        
+        // 创建新的listing - 优化存储布局
+        Listing storage listing = listings[listingId];
+        listing.id = listingId;
+        listing.nftContract = nftContract;
+        listing.seller = msg.sender;
+        listing.buyer = address(0);
+        listing.tokenId = tokenId;
+        listing.price = price;
+        listing.amount = amount;
+        listing.tokenType = TokenType.ERC1155;
+        listing.active = true;
+        listing.requiresWhitelist = requiresWhitelist;
         
         emit ListingCreated(
             listingId,
@@ -364,65 +362,79 @@ contract MyNFTMarketV4 is ReentrancyGuard, Ownable, EIP712 {
         uint256 totalPrice = listing.price * actualAmount;
         require(msg.value == totalPrice, "Payment amount does not match total price");
         
-        // 计算平台手续费和卖家所得
-        uint256 platformFee = (totalPrice * platformFeePercentage) / 10000;
-        uint256 sellerAmount = totalPrice - platformFee;
+        // 缓存seller地址以减少存储读取
+        address seller = listing.seller;
+        address nftContract = listing.nftContract;
+        uint256 tokenId = listing.tokenId;
+        TokenType tokenType = listing.tokenType;
+        uint256 price = listing.price;
         
-        // 更新listing状态
+        // 计算平台手续费和卖家所得
+        uint256 platformFee;
+        uint256 sellerAmount;
+        if (platformFeePercentage > 0) {
+            platformFee = (totalPrice * platformFeePercentage) / 10000;
+            sellerAmount = totalPrice - platformFee;
+        } else {
+            sellerAmount = totalPrice;
+        }
+        
+        // 更新listing状态（CEI模式：先更新状态）
         if (actualAmount == listing.amount) {
             // 如果全部购买，标记为失效
             listing.active = false;
-            nftToListingId[listing.nftContract][listing.tokenId] = 0;
+            nftToListingId[nftContract][tokenId] = 0;
         } else {
             // 部分购买，更新剩余数量
             listing.amount -= actualAmount;
         }
         listing.buyer = buyer;
         
+        // 发射事件（在外部调用之前）
+        emit NFTPurchased(
+            listingId,
+            nftContract,
+            tokenId,
+            tokenType,
+            seller,
+            buyer,
+            price,
+            actualAmount,
+            platformFee,
+            isPermitBuy,
+            block.timestamp
+        );
+        
+        // 外部交互（CEI模式：最后进行外部调用）
         // 转移NFT给买家
-        // wake-
-        if (listing.tokenType == TokenType.ERC721) {
-            // wake-disable-next-line
-            IERC721(listing.nftContract).transferFrom(
-                listing.seller,
+        // wake-disable
+        if (tokenType == TokenType.ERC721) {
+            IERC721(nftContract).transferFrom(
+                seller,
                 buyer,
-                listing.tokenId
+                tokenId
             );
         } else {
-            // wake-disable-next-line
-            IERC1155(listing.nftContract).safeTransferFrom(
-                listing.seller,
+            IERC1155(nftContract).safeTransferFrom(
+                seller,
                 buyer,
-                listing.tokenId,
+                tokenId,
                 actualAmount,
                 ""
             );
         }
         
         // 向卖家转账
-        // wake-disable-next-line
-        (bool sellerSuccess, ) = payable(listing.seller).call{value: sellerAmount}("");
+        (bool sellerSuccess, ) = payable(seller).call{value: sellerAmount}("");
         require(sellerSuccess, "Failed to transfer to seller");
         
-        // 向平台转账手续费
-        if ( platformFee >0 ){
+        // 向平台转账手续费（仅当手续费大于0时）
+        if (platformFee > 0) {
             (bool feeSuccess, ) = payable(feeReceiver).call{value: platformFee}("");
             require(feeSuccess, "Failed to transfer platform fee");
         }
         
-        emit NFTPurchased(
-            listingId,
-            listing.nftContract,
-            listing.tokenId,
-            listing.tokenType,
-            listing.seller,
-            buyer,
-            listing.price,
-            actualAmount,
-            platformFee,
-            isPermitBuy,
-            block.timestamp
-        );
+
     }
     
     /**
@@ -454,15 +466,20 @@ contract MyNFTMarketV4 is ReentrancyGuard, Ownable, EIP712 {
      */
     function getLatestListings(uint256 count) external view returns (Listing[] memory) {
         uint256 totalListings = _listingIdCounter;
-        count = count > totalListings ? totalListings : count;
+        if (count > totalListings) count = totalListings;
         
         Listing[] memory result = new Listing[](count);
         uint256 resultIndex = 0;
         
-        for (uint256 i = totalListings; i > 0 && resultIndex < count; i--) {
+        for (uint256 i = totalListings; i > 0 && resultIndex < count; ) {
             if (listings[i].active) {
                 result[resultIndex] = listings[i];
-                resultIndex++;
+                unchecked {
+                    resultIndex++;
+                }
+            }
+            unchecked {
+                i--;
             }
         }
         
@@ -489,10 +506,12 @@ contract MyNFTMarketV4 is ReentrancyGuard, Ownable, EIP712 {
         Listing[] memory result = new Listing[](count);
         uint256 resultIndex = 0;
         
-        for (uint256 i = 1; i <= totalListings; i++) {
+        for (uint256 i = 1; i <= totalListings && resultIndex < count; i++) {
             if (listings[i].seller == user) {
                 result[resultIndex] = listings[i];
-                resultIndex++;
+                unchecked {
+                    resultIndex++;
+                }
             }
         }
         
