@@ -13,6 +13,14 @@ import "./IPermit2.sol";
  * @dev 支持以太币和ERC20、ERC20Permit、ERC1363代币的银行合约
  */
 contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
+    // 链表节点结构
+    struct ListNode {
+        address user;           // 用户地址
+        uint256 balance;        // 以太币余额
+        address next;           // 下一个节点的用户地址
+        address prev;           // 上一个节点的用户地址
+    }
+    
     // 存储每个用户的以太币余额
     mapping(address => uint256) private _ethBalances;
     
@@ -22,8 +30,12 @@ contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
     // 记录合约的总以太币余额
     uint256 private _totalEthBalance;
     
-    // Permit2合约接口 - 不再在构造函数中初始化
-    // IPermit2 public immutable permit2;
+    // 前10名用户的链表相关变量
+    mapping(address => ListNode) private _topUsers;  // 用户地址到节点的映射
+    address private _head;                           // 链表头部（余额最高）
+    address private _tail;                           // 链表尾部（余额最低）
+    uint256 private _listSize;                       // 当前链表大小
+    uint256 private constant MAX_TOP_USERS = 10;     // 最大保存用户数量
     
     // 事件：当用户存入以太币时触发
     event EthDeposited(address indexed user, uint256 amount);
@@ -53,9 +65,106 @@ contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
         "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
     );
     
-    constructor() EIP712("Bank", "1") {
-        // 初始化EIP712
-        // permit2 不再在构造函数中初始化
+    constructor() EIP712("Bank", "1") {}
+    
+    /**
+     * @dev 更新用户在前10名链表中的位置
+     * @param user 用户地址
+     * @param newBalance 新的余额
+     */
+    function _updateTopUsersList(address user, uint256 newBalance) internal {
+        bool userInList = _topUsers[user].user != address(0) || user == _head;
+        
+        if (userInList) {
+            // 用户已在链表中，更新位置
+            _removeFromList(user);
+        }
+        
+        if (newBalance > 0) {
+            _insertIntoList(user, newBalance);
+        }
+    }
+    
+    /**
+     * @dev 将用户插入到链表的正确位置
+     * @param user 用户地址
+     * @param balance 用户余额
+     */
+    function _insertIntoList(address user, uint256 balance) internal {
+        // 如果链表为空
+        if (_listSize == 0) {
+            _head = user;
+            _tail = user;
+            _topUsers[user] = ListNode(user, balance, address(0), address(0));
+            _listSize = 1;
+            return;
+        }
+        
+        // 找到正确的插入位置（按余额降序）
+        address current = _head;
+        address prev = address(0);
+        
+        while (current != address(0) && _topUsers[current].balance >= balance) {
+            prev = current;
+            current = _topUsers[current].next;
+        }
+        
+        // 插入新节点
+        _topUsers[user] = ListNode(user, balance, current, prev);
+        
+        if (prev == address(0)) {
+            // 插入到头部
+            _head = user;
+            if (current != address(0)) {
+                _topUsers[current].prev = user;
+            }
+        } else {
+            // 插入到中间或尾部
+            _topUsers[prev].next = user;
+            if (current != address(0)) {
+                _topUsers[current].prev = user;
+            } else {
+                // 插入到尾部
+                _tail = user;
+            }
+        }
+        
+        _listSize++;
+        
+        // 如果链表超过10个，移除最后一个
+        if (_listSize > MAX_TOP_USERS) {
+            _removeFromList(_tail);
+        }
+    }
+    
+    /**
+     * @dev 从链表中移除用户
+     * @param user 用户地址
+     */
+    function _removeFromList(address user) internal {
+        if (_topUsers[user].user == address(0) && user != _head) {
+            return; // 用户不在链表中
+        }
+        
+        address prev = _topUsers[user].prev;
+        address next = _topUsers[user].next;
+        
+        if (prev != address(0)) {
+            _topUsers[prev].next = next;
+        } else {
+            // 移除的是头节点
+            _head = next;
+        }
+        
+        if (next != address(0)) {
+            _topUsers[next].prev = prev;
+        } else {
+            // 移除的是尾节点
+            _tail = prev;
+        }
+        
+        delete _topUsers[user];
+        _listSize--;
     }
     
     /**
@@ -69,6 +178,9 @@ contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
         
         _ethBalances[msg.sender] += msg.value;
         _totalEthBalance += msg.value;
+        
+        // 更新前10名用户链表
+        _updateTopUsersList(msg.sender, _ethBalances[msg.sender]);
         
         emit EthDeposited(msg.sender, msg.value);
     }
@@ -84,6 +196,9 @@ contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
         
         _ethBalances[msg.sender] -= amount;
         _totalEthBalance -= amount;
+        
+        // 更新前10名用户链表
+        _updateTopUsersList(msg.sender, _ethBalances[msg.sender]);
         
         emit EthWithdrawn(msg.sender, amount);
         
@@ -104,6 +219,10 @@ contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
         
         _ethBalances[msg.sender] -= amount;
         _ethBalances[to] += amount;
+        
+        // 更新发送方和接收方在前10名用户链表中的位置
+        _updateTopUsersList(msg.sender, _ethBalances[msg.sender]);
+        _updateTopUsersList(to, _ethBalances[to]);
         
         emit EthTransferred(msg.sender, to, amount);
     }
@@ -311,6 +430,60 @@ contract MyTokenBankV4 is ReentrancyGuard, EIP712 {
      */
     function getTotalEthBalance() external view returns (uint256) {
         return _totalEthBalance;
+    }
+    
+    /**
+     * @dev 获取前10名以太币存款用户列表
+     * @return users 用户地址数组
+     * @return balances 对应的余额数组
+     */
+    function getTopEthUsers() external view returns (address[] memory users, uint256[] memory balances) {
+        users = new address[](_listSize);
+        balances = new uint256[](_listSize);
+        
+        address current = _head;
+        uint256 index = 0;
+        
+        while (current != address(0) && index < _listSize) {
+            users[index] = current;
+            balances[index] = _topUsers[current].balance;
+            current = _topUsers[current].next;
+            index++;
+        }
+        
+        return (users, balances);
+    }
+    
+    /**
+     * @dev 获取指定用户在前10名中的排名
+     * @param user 用户地址
+     * @return rank 排名（1-10，0表示不在前10名）
+     */
+    function getUserRank(address user) external view returns (uint256 rank) {
+        if (_topUsers[user].user == address(0) && user != _head) {
+            return 0; // 用户不在前10名
+        }
+        
+        address current = _head;
+        uint256 currentRank = 1;
+        
+        while (current != address(0)) {
+            if (current == user) {
+                return currentRank;
+            }
+            current = _topUsers[current].next;
+            currentRank++;
+        }
+        
+        return 0;
+    }
+    
+    /**
+     * @dev 获取前10名链表的当前大小
+     * @return 链表大小
+     */
+    function getTopUsersCount() external view returns (uint256) {
+        return _listSize;
     }
     
     /**
