@@ -73,6 +73,7 @@ contract NFTMarketTest is Test {
             TOKEN_ID_721,
             MyNFTMarketV4.TokenType.ERC721,
             alice,
+            address(0), // paymentToken for ETH
             PRICE,
             1,
             false,
@@ -148,6 +149,7 @@ contract NFTMarketTest is Test {
             TOKEN_ID_1155,
             MyNFTMarketV4.TokenType.ERC1155,
             alice,
+            address(0), // paymentToken for ETH
             PRICE,
             AMOUNT_1155,
             false,
