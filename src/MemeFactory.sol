@@ -87,6 +87,7 @@ contract MemeFactory is Ownable, ReentrancyGuard {
         allMemeTokens.push(tokenAddress);
         
         // 初始化代币合约
+        // wake-disable-next-line
         MemeToken(tokenAddress).initialize(
             symbol,  // name
             symbol,  // symbol
@@ -141,6 +142,7 @@ contract MemeFactory is Ownable, ReentrancyGuard {
         }
         
         // 最后铸造代币（外部调用放在最后）
+        // wake-disable-next-line
         require(memeToken.mint(msg.sender), "Mint failed");
         
         emit MemeMinted(

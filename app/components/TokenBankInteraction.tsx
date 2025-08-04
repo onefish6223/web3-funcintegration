@@ -344,7 +344,7 @@ export default function TokenBankInteraction() {
           <div className="text-sm">当前银行合约地址: {bankAddress}</div>
           <div className="text-sm">当前代币合约地址: {tokenAddress}</div>
           <div className="text-sm">当前链 ID: {chainId}</div>
-          <div className="text-sm">默认银行地址: {defaultBankAddresses[chainId] || '未配置'}</div>
+<div className="text-sm">默认银行地址: {defaultBankAddresses[chainId] || '未配置'}</div>
           <div className="text-sm">默认代币地址: {defaultTokenAddresses[chainId] || '未配置'}</div>
         </div>
 
