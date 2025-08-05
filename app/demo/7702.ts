@@ -21,7 +21,7 @@ import {MyTokenBankV4_ABI} from "../abi/MyTokenBankV4";
 // const ERC20_ADDRESS = '0xe7f1725e7734ce288f8367e1bb143e90bb3f0512' as `0x${string}`;
 // const TOKENBANK_ADDRESS = '0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0' as `0x${string}`;
 
-const PRIVATE_KEY = "0x999999999";//修改私钥
+const PRIVATE_KEY = "0xeeee";//修改私钥
 const SIMPLE_DELEGATE_ADDRESS = "0x1Cb51F196b30015aB4126427157E6a15BBb7cBBC" as `0x${string}`;
 const ERC20_ADDRESS = "0xD67ee2ff8F2B5FFC0B7B8689b9e1626B70452C44" as `0x${string}`;
 const TOKENBANK_ADDRESS = "0xD0b5Ae39222f9F09876fEDD0eba7B56a5895808B" as `0x${string}`;
@@ -147,16 +147,16 @@ async function main() {
   await getTokenBalance(TOKENBANK_ADDRESS, publicClient, walletClient);
   await getTokenBalance(eoa.address, publicClient, walletClient);
 
-  // const cancelAuthorization = await walletClient.signAuthorization({
-  //   contractAddress: zeroAddress,
-  //   executor: 'self',
-  // });
-  // const cancelHash = await walletClient.sendTransaction({
-  //   authorizationList: [cancelAuthorization],
-  //   to: zeroAddress,
-  // })
-  // const cancelReceipt: TransactionReceipt = await publicClient.waitForTransactionReceipt({ hash: cancelHash })
-  // console.log('取消 delegate 交易状态:', cancelReceipt.status === 'success' ? '成功' : '失败')
+  const cancelAuthorization = await walletClient.signAuthorization({
+    contractAddress: zeroAddress,
+    executor: 'self',
+  });
+  const cancelHash = await walletClient.sendTransaction({
+    authorizationList: [cancelAuthorization],
+    to: zeroAddress,
+  })
+  const cancelReceipt: TransactionReceipt = await publicClient.waitForTransactionReceipt({ hash: cancelHash })
+  console.log('取消 delegate 交易状态:', cancelReceipt.status === 'success' ? '成功' : '失败')
 
   await getCodeAtAddress(eoa.address, publicClient);
 }

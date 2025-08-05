@@ -13,7 +13,7 @@ contract SimpleProxyTest is Test {
     SimpleProxy public proxy;
     UserContractV1 public logicV1;
     UserContractV2 public logicV2;
-    
+    //wake-disable
     address public user = address(0x1234);
     
     function setUp() public {

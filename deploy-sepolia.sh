@@ -73,13 +73,13 @@ deploy_contracts() {
     echo -e "${BLUE}部署合约到 Sepolia...${NC}"
     
     # 运行部署脚本
-    forge script script/DeployToSepolia.s.sol:DeployToSepolia \
+    forge script script/UpgradeContracts.s.sol:UpgradeContracts \
         --rpc-url https://sepolia.infura.io/v3/$INFURA_PROJECT_ID \
         --private-key $PRIVATE_KEY \
         --broadcast \
         --verify \
         --etherscan-api-key $ETHERSCAN_API_KEY \
-        -vvvv
+        -vvv
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}合约部署成功${NC}"
